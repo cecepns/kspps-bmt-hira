@@ -159,6 +159,7 @@ export const RekapLaporan = () => {
         { KETERANGAN: 'Total Setoran Tunai', NOMINAL: rekapBulananData?.total_setoran || 0 },
         { KETERANGAN: 'Total Penarikan Tunai', NOMINAL: rekapBulananData?.total_penarikan || 0 },
         { KETERANGAN: 'Total Transaksi Slip', JUMLAH: rekapBulananData?.total_transaksi_count || 0 },
+        { KETERANGAN: 'Jumlah Kunjungan', JUMLAH: rekapBulananData?.total_kunjungan_count || 0 },
         { KETERANGAN: 'Total Calon Prospek', JUMLAH: rekapBulananData?.total_prospek_count || 0 },
         { KETERANGAN: 'Total Anggota Registered', JUMLAH: rekapBulananData?.total_anggota_count || 0 }
       ];
@@ -509,7 +510,7 @@ export const RekapLaporan = () => {
         ) : (
           /* Rekap Bulanan */
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <span className="text-xs font-semibold text-slate-500">TOTAL SETORAN (BULAN INI)</span>
                 <h3 className="text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapBulananData?.total_setoran)}</h3>
@@ -521,6 +522,10 @@ export const RekapLaporan = () => {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <span className="text-xs font-semibold text-slate-500">TOTAL TRANSAKSI</span>
                 <h3 className="text-lg font-bold text-slate-800 mt-1">{rekapBulananData?.total_transaksi_count || 0} Slip</h3>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <span className="text-xs font-black text-amber-800 uppercase">JUMLAH KUNJUNGAN</span>
+                <h3 className="text-xl font-black text-amber-600 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
               </div>
             </div>
           </div>

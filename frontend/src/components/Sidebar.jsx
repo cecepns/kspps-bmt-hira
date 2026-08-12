@@ -29,9 +29,9 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
     { label: 'Data Anggota', path: '/nasabah', icon: UserCheck },
     { label: 'Daftar Prospek', path: '/prospek', icon: Users },
     { label: 'Anggota Tidak Transaksi', path: '/tidak-transaksi', icon: UserX },
-    { label: 'Laporan Harian Kas', path: '/laporan-kas', icon: Wallet },
     { label: 'Anggota Tidak Dikunjungi', path: '/tidak-dikunjungi', icon: UserMinus },
     { label: 'Kas Disetor (Pecahan Tunai)', path: '/pecahan', icon: Coins },
+    { label: 'Laporan Harian Kas', path: '/laporan-kas', icon: Wallet },
     { label: 'Rekapan & Laporan', path: '/rekap', icon: FileSpreadsheet },
   ];
 
@@ -77,7 +77,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
           <div className="overflow-hidden">
             <p className="text-xs font-semibold text-white truncate">{user?.nama || 'Pengguna'}</p>
             <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-medium capitalize border border-sky-500/30">
-              {user?.role || 'Pegawai'}
+              {user?.role === 'admin' ? 'Admin' : 'Marketing'}
             </span>
           </div>
         </div>

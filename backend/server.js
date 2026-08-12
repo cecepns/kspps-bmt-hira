@@ -755,18 +755,78 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
-  const bulan = req.query.bulan || (new Date().getMonth() + 1);
-  const tahun = req.query.tahun || new Date().getFullYear();
+  const bulan = parseInt(req.query.bulan) || (new Date().getMonth() + 1);
+  const tahun = parseInt(req.query.tahun) || new Date().getFullYear();
   const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  const filteredTx = mockStore.transaksi.filter(t => !userId || t.user_id === userId);
+  if (isDbConnected) {
+    try {
+      let slipWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+      let params = [bulan, tahun];
+      if (userId) { slipWhere += ' AND user_id = ?'; params.push(userId); }
+
+      const [slipRows] = await pool.query(`SELECT tipe, nominal FROM transaksi_harian WHERE ${slipWhere}`, params);
+      const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+      const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+      const totalTxCount = slipRows.length;
+
+      let pParams = [bulan, tahun];
+      let pWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+      if (userId) { pWhere += ' AND user_id = ?'; pParams.push(userId); }
+      const [prospekRows] = await pool.query(`SELECT COUNT(*) as cnt FROM daftar_prospek WHERE ${pWhere}`, pParams);
+
+      let ttParams = [bulan, tahun];
+      let ttWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+      if (userId) { ttWhere += ' AND user_id = ?'; ttParams.push(userId); }
+      const [ttRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_transaksi WHERE ${ttWhere}`, ttParams);
+
+      let tkParams = [bulan, tahun];
+      let tkWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+      if (userId) { tkWhere += ' AND user_id = ?'; tkParams.push(userId); }
+      const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE ${tkWhere}`, tkParams);
+
+      const [nasabahRows] = await pool.query('SELECT COUNT(*) as cnt FROM nasabah');
+
+      const prospekCount = prospekRows[0]?.cnt || 0;
+      const ttCount = ttRows[0]?.cnt || 0;
+      const tkCount = tkRows[0]?.cnt || 0;
+      const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount;
+
+      return res.json({
+        success: true,
+        data: {
+          bulan,
+          tahun,
+          total_setoran: totalSetoran,
+          total_penarikan: totalPenarikan,
+          total_transaksi_count: totalTxCount,
+          total_kunjungan_count: totalKunjungan,
+          total_prospek_count: prospekCount,
+          total_anggota_count: nasabahRows[0]?.cnt || 0
+        }
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  const isMatchingDate = (dateStr) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return (d.getMonth() + 1) === bulan && d.getFullYear() === tahun;
+  };
+
+  const filteredTx = mockStore.transaksi.filter(t => isMatchingDate(t.tanggal) && (!userId || t.user_id === userId));
   const totalSetoran = filteredTx
     .filter(t => t.tipe === 'setoran')
-    .reduce((acc, curr) => acc + curr.nominal, 0);
+    .reduce((acc, curr) => acc + Number(curr.nominal), 0);
 
   const totalPenarikan = filteredTx
     .filter(t => t.tipe === 'penarikan')
-    .reduce((acc, curr) => acc + curr.nominal, 0);
+    .reduce((acc, curr) => acc + Number(curr.nominal), 0);
+
+  const prospekCount = mockStore.prospek.filter(p => isMatchingDate(p.tanggal) && (!userId || p.user_id === userId)).length;
+  const ttCount = mockStore.tidak_transaksi.filter(x => isMatchingDate(x.tanggal) && (!userId || x.user_id === userId)).length;
+  const tkCount = mockStore.tidak_dikunjungi.filter(x => isMatchingDate(x.tanggal) && (!userId || x.user_id === userId)).length;
+  const totalKunjungan = filteredTx.length + prospekCount + ttCount + tkCount;
 
   res.json({
     success: true,
@@ -776,7 +836,8 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
       total_setoran: totalSetoran,
       total_penarikan: totalPenarikan,
       total_transaksi_count: filteredTx.length,
-      total_prospek_count: mockStore.prospek.filter(p => !userId || p.user_id === userId).length,
+      total_kunjungan_count: totalKunjungan,
+      total_prospek_count: prospekCount,
       total_anggota_count: mockStore.nasabah.length
     }
   });
