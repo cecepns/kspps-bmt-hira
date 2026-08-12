@@ -10,6 +10,8 @@ export const RekapLaporan = () => {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [bulan, setBulan] = useState(new Date().getMonth() + 1);
   const [tahun, setTahun] = useState(new Date().getFullYear());
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [userOptions, setUserOptions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Rekap Data State
@@ -17,17 +19,34 @@ export const RekapLaporan = () => {
   const [rekapBulananData, setRekapBulananData] = useState(null);
 
   useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'harian') {
       fetchRekapHarian();
     } else {
       fetchRekapBulanan();
     }
-  }, [activeTab, tanggal, bulan, tahun]);
+  }, [activeTab, tanggal, bulan, tahun, selectedUserId]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await request.get(API_ENDPOINTS.USERS.LIST, { limit: 100 });
+      if (res.success) {
+        setUserOptions(res.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchRekapHarian = async () => {
     setLoading(true);
     try {
-      const res = await request.get(API_ENDPOINTS.REKAP.HARIAN, { tanggal });
+      const params = { tanggal };
+      if (selectedUserId) params.user_id = selectedUserId;
+      const res = await request.get(API_ENDPOINTS.REKAP.HARIAN, params);
       if (res.success) {
         setRekapHarianData(res.data);
       }
@@ -41,7 +60,9 @@ export const RekapLaporan = () => {
   const fetchRekapBulanan = async () => {
     setLoading(true);
     try {
-      const res = await request.get(API_ENDPOINTS.REKAP.BULANAN, { bulan, tahun });
+      const params = { bulan, tahun };
+      if (selectedUserId) params.user_id = selectedUserId;
+      const res = await request.get(API_ENDPOINTS.REKAP.BULANAN, params);
       if (res.success) {
         setRekapBulananData(res.data);
       }
@@ -56,10 +77,27 @@ export const RekapLaporan = () => {
     window.print();
   };
 
+  const totalTransaksiNominal = (rekapHarianData?.slip || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+  const totalJumlahKunjungan = (rekapHarianData?.slip?.length || 0) +
+    (rekapHarianData?.prospek?.length || 0) +
+    (rekapHarianData?.tidak_transaksi?.length || 0) +
+    (rekapHarianData?.tidak_dikunjungi?.length || 0);
+
+  const selectedUserObj = userOptions.find(u => String(u.id) === String(selectedUserId));
+
   const exportToExcel = () => {
     const workbook = XLSX.utils.book_new();
 
     if (activeTab === 'harian') {
+      // Summary Sheet
+      const summaryData = [
+        { METRIK: 'JUMLAH TRANSAKSI SLIP', NILAI: rekapHarianData?.slip?.length || 0 },
+        { METRIK: 'TOTAL NOMINAL TRANSAKSI', NILAI: totalTransaksiNominal },
+        { METRIK: 'JUMLAH KUNJUNGAN', NILAI: totalJumlahKunjungan }
+      ];
+      const wsSum = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, wsSum, 'Ringkasan Kunjungan');
+
       // 1. Slip Setoran/Penarikan Sheet
       const slipData = (rekapHarianData?.slip || []).map((item, idx) => ({
         NO: idx + 1,
@@ -107,7 +145,7 @@ export const RekapLaporan = () => {
       const kasInfo = [
         { KETERANGAN: 'KAS KANTOR', KAS_MASUK: rekapHarianData?.laporan_kas?.kas_kantor || 0, KAS_KELUAR: 0 },
         { KETERANGAN: 'KOLEKTOR', KAS_MASUK: rekapHarianData?.laporan_kas?.kolektor || 0, KAS_KELUAR: 0 },
-        { KETERANGAN: 'SIBELA', KAS_MASUK: rekapHarianData?.laporan_kas?.penerimaan_sibela || 0, KAS_KELUAR: rekapHarianData?.laporan_kas?.pengeluaran_sibela || 0 },
+        { KETERANGAN: 'SIRELA', KAS_MASUK: rekapHarianData?.laporan_kas?.penerimaan_sibela || 0, KAS_KELUAR: rekapHarianData?.laporan_kas?.pengeluaran_sibela || 0 },
         { KETERANGAN: 'PINJAMAN', KAS_MASUK: 0, KAS_KELUAR: rekapHarianData?.laporan_kas?.pengeluaran_pinjaman || 0 },
         { KETERANGAN: 'TOTAL', KAS_MASUK: rekapHarianData?.laporan_kas?.total_kas_masuk || 0, KAS_KELUAR: rekapHarianData?.laporan_kas?.total_kas_keluar || 0 },
         { KETERANGAN: 'KAS DISETOR (PECAHAN TUNAI)', KAS_MASUK: rekapHarianData?.rincian_pecahan?.jumlah_total || 0, KAS_KELUAR: 0 }
@@ -160,6 +198,23 @@ export const RekapLaporan = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Employee Filter */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-slate-600">Marketing:</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none bg-slate-50 font-medium"
+            >
+              <option value="">-- Semua Marketing --</option>
+              {userOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nama} ({u.jabatan || 'Marketing'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {activeTab === 'harian' ? (
             <input
               type="date"
@@ -220,7 +275,7 @@ export const RekapLaporan = () => {
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-slate-900">KSPPS BMT HIRA</h1>
-              <p className="text-xs font-bold text-sky-700 uppercase tracking-widest">Mitra Tepat Bermuamalat</p>
+              <p className="text-xs font-bold text-sky-700 uppercase tracking-widest">LAPORAN HARIAN MARKETING</p>
               <p className="text-[11px] text-slate-500">Kantor Layanan Simpan Pinjam Syariah</p>
             </div>
           </div>
@@ -228,8 +283,11 @@ export const RekapLaporan = () => {
             <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
               {activeTab === 'harian' ? 'LAPORAN REKAPITULASI HARIAN' : 'LAPORAN REKAPITULASI BULANAN'}
             </h2>
+            <p className="text-xs font-semibold text-slate-700 mt-1">
+              MARKETING: <span className="font-bold text-sky-800">{selectedUserObj ? selectedUserObj.nama : 'SEMUA MARKETING'}</span>
+            </p>
             <p className="text-xs font-medium text-slate-600">
-              {activeTab === 'harian' ? `Tanggal: ${tanggal}` : `Periode: ${bulan} / ${tahun}`}
+              {activeTab === 'harian' ? `HARI / TGL : ${tanggal}` : `Periode: ${bulan} / ${tahun}`}
             </p>
           </div>
         </div>
@@ -238,6 +296,31 @@ export const RekapLaporan = () => {
           <div className="py-12 text-center text-xs text-slate-400">Menyiapkan format rekapitulasi...</div>
         ) : activeTab === 'harian' ? (
           <div className="space-y-6 text-xs">
+            {/* SUMMARY BARIS ATAS SESUAI EXCEL CLIENT */}
+            <div className="border border-slate-900 rounded-lg overflow-hidden">
+              <div className="bg-slate-900 text-white p-2 font-bold uppercase text-[11px] tracking-wider">
+                TRANSAKSI KOLEKTOR / MARKETING
+              </div>
+              <div className="grid grid-cols-4 divide-x divide-slate-300 text-center bg-slate-50">
+                <div className="p-2">
+                  <span className="block text-[10px] font-bold text-slate-600 uppercase">JUMLAH TRANSAKSI</span>
+                  <span className="text-sm font-black text-slate-900">{rekapHarianData?.slip?.length || 0} Slip</span>
+                </div>
+                <div className="p-2">
+                  <span className="block text-[10px] font-bold text-slate-600 uppercase">TOTAL NOMINAL</span>
+                  <span className="text-sm font-black text-emerald-700">{formatRupiah(totalTransaksiNominal)}</span>
+                </div>
+                <div className="p-2">
+                  <span className="block text-[10px] font-bold text-slate-600 uppercase">SELISIH</span>
+                  <span className="text-sm font-black text-slate-700">Rp 0</span>
+                </div>
+                <div className="p-2 bg-amber-100/80">
+                  <span className="block text-[10px] font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
+                  <span className="text-base font-black text-amber-700">{totalJumlahKunjungan}</span>
+                </div>
+              </div>
+            </div>
+
             {/* 1. SLIP SETORAN & PENARIKAN */}
             <div>
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
@@ -377,7 +460,7 @@ export const RekapLaporan = () => {
                   <div className="p-2 space-y-1">
                     <div className="flex justify-between"><span>1. KAS KANTOR</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.kas_kantor)}</span></div>
                     <div className="flex justify-between"><span>2. KOLEKTOR</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.kolektor)}</span></div>
-                    <div className="flex justify-between"><span>3. SIBELA</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.penerimaan_sibela)}</span></div>
+                    <div className="flex justify-between"><span>3. SIRELA</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.penerimaan_sibela)}</span></div>
                     <div className="flex justify-between border-t pt-1 font-bold"><span>TOTAL KAS MASUK</span><span>{formatRupiah(rekapHarianData?.laporan_kas?.total_kas_masuk)}</span></div>
                   </div>
                 </div>
@@ -385,7 +468,7 @@ export const RekapLaporan = () => {
                 <div>
                   <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PENGELUARAN</div>
                   <div className="p-2 space-y-1">
-                    <div className="flex justify-between"><span>1. SIBELA</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.pengeluaran_sibela)}</span></div>
+                    <div className="flex justify-between"><span>1. SIRELA</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.pengeluaran_sibela)}</span></div>
                     <div className="flex justify-between"><span>2. PINJAMAN</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.pengeluaran_pinjaman)}</span></div>
                     <div className="flex justify-between border-t pt-1 font-bold"><span>TOTAL KAS KELUAR</span><span>{formatRupiah(rekapHarianData?.laporan_kas?.total_kas_keluar)}</span></div>
                   </div>

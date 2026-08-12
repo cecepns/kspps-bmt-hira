@@ -6,6 +6,8 @@ import { Coins, Save, CheckCircle2 } from 'lucide-react';
 
 export const KasDisetorPecahan = ({ user }) => {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [userOptions, setUserOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,19 +29,37 @@ export const KasDisetorPecahan = ({ user }) => {
   });
 
   const [signatures, setSignatures] = useState({
-    teller_name: user?.nama || 'Ahmad Teller',
-    mengetahui_name: 'Koordinator Kolektor',
+    teller_name: user?.nama || 'Ahmad Marketing',
+    mengetahui_name: 'Koordinator Marketing',
     manager_name: 'Administrator BMT'
   });
 
   useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
     fetchPecahanData();
-  }, [tanggal]);
+  }, [tanggal, selectedUserId]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await request.get(API_ENDPOINTS.USERS.LIST, { limit: 100 });
+      if (res.success) {
+        setUserOptions(res.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchPecahanData = async () => {
     setLoading(true);
     try {
-      const res = await request.get(API_ENDPOINTS.PECAHAN.GET, { tanggal });
+      const params = { tanggal };
+      if (selectedUserId) params.user_id = selectedUserId;
+
+      const res = await request.get(API_ENDPOINTS.PECAHAN.GET, params);
       if (res.success && res.data) {
         setPecahan({
           p100k: res.data.p100k || 0,
@@ -56,7 +76,7 @@ export const KasDisetorPecahan = ({ user }) => {
         if (res.data.teller_name) {
           setSignatures({
             teller_name: res.data.teller_name,
-            mengetahui_name: res.data.mengetahui_name || 'Koordinator Kolektor',
+            mengetahui_name: res.data.mengetahui_name || 'Koordinator Marketing',
             manager_name: res.data.manager_name || 'Administrator BMT'
           });
         }
@@ -112,18 +132,36 @@ export const KasDisetorPecahan = ({ user }) => {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">KAS DISETOR (RINCIAN PECAHAN UANG)</h2>
-            <p className="text-xs text-slate-500">Hitung otomatis total fisik uang tunai disetor teller/kolektor</p>
+            <p className="text-xs text-slate-500">Hitung otomatis total fisik uang tunai disetor Marketing / Kolektor</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-600">Pilih Tanggal:</label>
-          <input
-            type="date"
-            value={tanggal}
-            onChange={(e) => setTanggal(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none font-medium bg-slate-50"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600">Marketing:</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none font-medium bg-slate-50"
+            >
+              <option value="">-- Semua Marketing --</option>
+              {userOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nama} ({u.jabatan || 'Marketing'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600">Tanggal:</label>
+            <input
+              type="date"
+              value={tanggal}
+              onChange={(e) => setTanggal(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none font-medium bg-slate-50"
+            />
+          </div>
         </div>
       </div>
 

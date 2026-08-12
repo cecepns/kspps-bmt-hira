@@ -1,15 +1,15 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  UserCheck, 
-  Receipt, 
-  UserX, 
-  UserMinus, 
-  Wallet, 
-  Coins, 
-  FileSpreadsheet, 
+import {
+  LayoutDashboard,
+  Users,
+  UserCheck,
+  Receipt,
+  UserX,
+  UserMinus,
+  Wallet,
+  Coins,
+  FileSpreadsheet,
   LogOut,
   X
 } from 'lucide-react';
@@ -26,11 +26,11 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Transaksi Slip (Penarikan/Setoran)', path: '/transaksi', icon: Receipt },
-    { label: 'Data Nasabah', path: '/nasabah', icon: UserCheck },
+    { label: 'Data Anggota', path: '/nasabah', icon: UserCheck },
     { label: 'Daftar Prospek', path: '/prospek', icon: Users },
     { label: 'Anggota Tidak Transaksi', path: '/tidak-transaksi', icon: UserX },
-    { label: 'Anggota Tidak Dikunjungi', path: '/tidak-dikunjungi', icon: UserMinus },
     { label: 'Laporan Harian Kas', path: '/laporan-kas', icon: Wallet },
+    { label: 'Anggota Tidak Dikunjungi', path: '/tidak-dikunjungi', icon: UserMinus },
     { label: 'Kas Disetor (Pecahan Tunai)', path: '/pecahan', icon: Coins },
     { label: 'Rekapan & Laporan', path: '/rekap', icon: FileSpreadsheet },
   ];
@@ -43,8 +43,8 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
     <>
       {/* Overlay Backdrop for Mobile */}
       {isOpen && (
-        <div 
-          onClick={onClose} 
+        <div
+          onClick={onClose}
           className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden transition-opacity"
         />
       )}
@@ -93,8 +93,8 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
                 onClick={onClose}
                 className={({ isActive }) => `
                   flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200
-                  ${isActive 
-                    ? 'bg-gradient-to-r from-sky-600 to-sky-700 text-white shadow-md shadow-sky-600/30 font-semibold' 
+                  ${isActive
+                    ? 'bg-gradient-to-r from-sky-600 to-sky-700 text-white shadow-md shadow-sky-600/30 font-semibold'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'}
                 `}
               >

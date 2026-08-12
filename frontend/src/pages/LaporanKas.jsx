@@ -148,7 +148,7 @@ export const LaporanKas = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">3. SIBELA / SETORAN (Rp)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">3. SIRELA / SETORAN (Rp)</label>
                   <input
                     type="number"
                     value={formData.penerimaan_sibela || ''}
@@ -184,7 +184,7 @@ export const LaporanKas = () => {
               </div>
               <div className="p-5 space-y-4 flex-1">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">1. SIBELA / PENARIKAN (Rp)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">1. SIRELA / PENARIKAN (Rp)</label>
                   <input
                     type="number"
                     value={formData.pengeluaran_sibela || ''}

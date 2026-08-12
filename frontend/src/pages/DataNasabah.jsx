@@ -71,15 +71,15 @@ export const DataNasabah = () => {
     try {
       if (editingItem) {
         const res = await request.put(API_ENDPOINTS.NASABAH.UPDATE(editingItem.id), formData);
-        if (res.success) toast.success('Data nasabah berhasil diperbarui');
+        if (res.success) toast.success('Data anggota berhasil diperbarui');
       } else {
         const res = await request.post(API_ENDPOINTS.NASABAH.CREATE, formData);
-        if (res.success) toast.success('Nasabah berhasil ditambahkan');
+        if (res.success) toast.success('Anggota berhasil ditambahkan');
       }
       setIsModalOpen(false);
       fetchNasabah();
     } catch (err) {
-      toast.error(err.message || 'Gagal menyimpan data nasabah');
+      toast.error(err.message || 'Gagal menyimpan data anggota');
     } finally {
       setSubmitting(false);
     }
@@ -88,7 +88,7 @@ export const DataNasabah = () => {
   const handleDelete = (id, nama) => {
     toast((t) => (
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-slate-800">Hapus nasabah <span className="font-bold text-rose-600">{nama}</span>?</p>
+        <p className="text-xs font-semibold text-slate-800">Hapus anggota <span className="font-bold text-rose-600">{nama}</span>?</p>
         <div className="flex gap-2 justify-end">
           <button
             onClick={() => toast.dismiss(t.id)}
@@ -102,11 +102,11 @@ export const DataNasabah = () => {
               try {
                 const res = await request.delete(API_ENDPOINTS.NASABAH.DELETE(id));
                 if (res.success) {
-                  toast.success('Nasabah berhasil dihapus');
+                  toast.success('Anggota berhasil dihapus');
                   fetchNasabah();
                 }
               } catch (err) {
-                toast.error('Gagal menghapus nasabah');
+                toast.error('Gagal menghapus anggota');
               }
             }}
             className="px-2.5 py-1 bg-rose-600 text-white text-xs rounded-lg font-medium shadow-sm"
@@ -138,18 +138,18 @@ export const DataNasabah = () => {
           className="w-full sm:w-auto px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md shadow-sky-600/20 transition flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          <span>Tambah Anggota/Nasabah</span>
+          <span>Tambah Anggota</span>
         </button>
       </div>
 
       {/* Table Container */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-400">Memuat data nasabah...</div>
+          <div className="py-12 text-center text-xs text-slate-400">Memuat data anggota...</div>
         ) : data.length === 0 ? (
           <div className="py-12 text-center space-y-2">
             <UserCheck className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-xs font-medium text-slate-500">Tidak ada data nasabah ditemukan</p>
+            <p className="text-xs font-medium text-slate-500">Tidak ada data anggota ditemukan</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -212,7 +212,7 @@ export const DataNasabah = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingItem ? 'Edit Data Nasabah' : 'Tambah Nasabah Baru'}
+        title={editingItem ? 'Edit Data Anggota' : 'Tambah Anggota Baru'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -226,7 +226,7 @@ export const DataNasabah = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Nama Anggota/Nasabah</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Nama Anggota</label>
             <input
               type="text"
               value={formData.nama}
@@ -270,7 +270,7 @@ export const DataNasabah = () => {
               disabled={submitting}
               className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50"
             >
-              {submitting ? 'Menyimpan...' : 'Simpan Nasabah'}
+              {submitting ? 'Menyimpan...' : 'Simpan Data Anggota'}
             </button>
           </div>
         </form>

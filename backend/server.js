@@ -42,7 +42,7 @@ checkDb();
 const mockStore = {
   users: [
     { id: 1, nama: 'Administrator BMT', username: 'admin', password: 'admin123', role: 'admin', jabatan: 'Manager Cabang', no_hp: '081234567890', status: 'aktif' },
-    { id: 2, nama: 'Ahmad Teller', username: 'ahmad', password: 'pegawai123', role: 'pegawai', jabatan: 'Teller / Kolektor', no_hp: '089876543210', status: 'aktif' }
+    { id: 2, nama: 'Ahmad Marketing', username: 'ahmad', password: 'pegawai123', role: 'pegawai', jabatan: 'Marketing', no_hp: '089876543210', status: 'aktif' }
   ],
   nasabah: [
     { id: 1, no_rek: '101.01.001', nama: 'Budi Santoso', alamat: 'Jl. Merdeka No. 12, Bandung', no_hp: '0811111111', status: 'aktif' },
@@ -541,15 +541,20 @@ createModuleEndpoints('tidak-dikunjungi', 'tidak_dikunjungi', 'tidak_dikunjungi'
 // --- LAPORAN HARIAN KAS & PECAHAN UANG TUNAI ---
 app.get('/api/laporan-kas', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
   if (isDbConnected) {
     try {
-      const [rows] = await pool.query('SELECT * FROM laporan_harian_kas WHERE tanggal = ? ORDER BY id DESC LIMIT 1', [tanggal]);
+      let q = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
+      let p = [tanggal];
+      if (userId) { q += ' AND user_id = ?'; p.push(userId); }
+      q += ' ORDER BY id DESC LIMIT 1';
+      const [rows] = await pool.query(q, p);
       return res.json({ success: true, data: rows[0] || null });
     } catch (e) { console.error(e); }
   }
 
-  const record = mockStore.laporan_kas.find(l => l.tanggal === tanggal) || null;
+  const record = mockStore.laporan_kas.find(l => l.tanggal === tanggal && (!userId || l.user_id === userId)) || null;
   res.json({ success: true, data: record });
 });
 
@@ -575,7 +580,7 @@ app.post('/api/laporan-kas', authMiddleware, async (req, res) => {
     } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
   }
 
-  const existingIdx = mockStore.laporan_kas.findIndex(l => l.tanggal === dateStr);
+  const existingIdx = mockStore.laporan_kas.findIndex(l => l.tanggal === dateStr && l.user_id === req.user.id);
   const newData = {
     id: existingIdx >= 0 ? mockStore.laporan_kas[existingIdx].id : mockStore.laporan_kas.length + 1,
     tanggal: dateStr,
@@ -601,15 +606,20 @@ app.post('/api/laporan-kas', authMiddleware, async (req, res) => {
 // --- RINCIAN PECAHAN UANG KAS DISETOR ---
 app.get('/api/pecahan', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
   if (isDbConnected) {
     try {
-      const [rows] = await pool.query('SELECT * FROM rincian_pecahan WHERE tanggal = ? ORDER BY id DESC LIMIT 1', [tanggal]);
+      let q = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
+      let p = [tanggal];
+      if (userId) { q += ' AND user_id = ?'; p.push(userId); }
+      q += ' ORDER BY id DESC LIMIT 1';
+      const [rows] = await pool.query(q, p);
       return res.json({ success: true, data: rows[0] || null });
     } catch (e) { console.error(e); }
   }
 
-  const item = mockStore.pecahan.find(p => p.tanggal === tanggal) || null;
+  const item = mockStore.pecahan.find(p => p.tanggal === tanggal && (!userId || p.user_id === userId)) || null;
   res.json({ success: true, data: item });
 });
 
@@ -671,13 +681,64 @@ app.post('/api/pecahan', authMiddleware, async (req, res) => {
 // --- REKAPITULASI HARIAN & BULANAN LENGKAP ---
 app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  const slip = mockStore.transaksi.filter(t => t.tanggal === tanggal);
-  const prospek = mockStore.prospek.filter(p => p.tanggal === tanggal);
-  const tidak_transaksi = mockStore.tidak_transaksi.filter(x => x.tanggal === tanggal);
-  const tidak_dikunjungi = mockStore.tidak_dikunjungi.filter(x => x.tanggal === tanggal);
-  const laporan_kas = mockStore.laporan_kas.find(l => l.tanggal === tanggal) || null;
-  const rincian_pecahan = mockStore.pecahan.find(p => p.tanggal === tanggal) || null;
+  if (isDbConnected) {
+    try {
+      let slipQ = 'SELECT t.*, n.no_rek, n.nama, n.alamat, u.nama as pegawai_nama FROM transaksi_harian t JOIN nasabah n ON t.nasabah_id = n.id JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+      let slipP = [tanggal];
+      if (userId) { slipQ += ' AND t.user_id = ?'; slipP.push(userId); }
+      const [slip] = await pool.query(slipQ, slipP);
+
+      let prospekQ = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE p.tanggal = ?';
+      let prospekP = [tanggal];
+      if (userId) { prospekQ += ' AND p.user_id = ?'; prospekP.push(userId); }
+      const [prospek] = await pool.query(prospekQ, prospekP);
+
+      let tdkTxQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_transaksi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+      let tdkTxP = [tanggal];
+      if (userId) { tdkTxQ += ' AND t.user_id = ?'; tdkTxP.push(userId); }
+      const [tidak_transaksi] = await pool.query(tdkTxQ, tdkTxP);
+
+      let tdkKunjungQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_dikunjungi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+      let tdkKunjungP = [tanggal];
+      if (userId) { tdkKunjungQ += ' AND t.user_id = ?'; tdkKunjungP.push(userId); }
+      const [tidak_dikunjungi] = await pool.query(tdkKunjungQ, tdkKunjungP);
+
+      let kasQ = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
+      let kasP = [tanggal];
+      if (userId) { kasQ += ' AND user_id = ?'; kasP.push(userId); }
+      kasQ += ' ORDER BY id DESC LIMIT 1';
+      const [kasRows] = await pool.query(kasQ, kasP);
+
+      let pecahanQ = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
+      let pecahanP = [tanggal];
+      if (userId) { pecahanQ += ' AND user_id = ?'; pecahanP.push(userId); }
+      pecahanQ += ' ORDER BY id DESC LIMIT 1';
+      const [pecahanRows] = await pool.query(pecahanQ, pecahanP);
+
+      return res.json({
+        success: true,
+        data: {
+          tanggal,
+          slip,
+          prospek,
+          tidak_transaksi,
+          tidak_dikunjungi,
+          laporan_kas: kasRows[0] || null,
+          rincian_pecahan: pecahanRows[0] || null
+        }
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  // Fallback mock
+  const slip = mockStore.transaksi.filter(t => t.tanggal === tanggal && (!userId || t.user_id === userId));
+  const prospek = mockStore.prospek.filter(p => p.tanggal === tanggal && (!userId || p.user_id === userId));
+  const tidak_transaksi = mockStore.tidak_transaksi.filter(x => x.tanggal === tanggal && (!userId || x.user_id === userId));
+  const tidak_dikunjungi = mockStore.tidak_dikunjungi.filter(x => x.tanggal === tanggal && (!userId || x.user_id === userId));
+  const laporan_kas = mockStore.laporan_kas.find(l => l.tanggal === tanggal && (!userId || l.user_id === userId)) || null;
+  const rincian_pecahan = mockStore.pecahan.find(p => p.tanggal === tanggal && (!userId || p.user_id === userId)) || null;
 
   res.json({
     success: true,
@@ -696,12 +757,14 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
 app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
   const bulan = req.query.bulan || (new Date().getMonth() + 1);
   const tahun = req.query.tahun || new Date().getFullYear();
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  const totalSetoran = mockStore.transaksi
+  const filteredTx = mockStore.transaksi.filter(t => !userId || t.user_id === userId);
+  const totalSetoran = filteredTx
     .filter(t => t.tipe === 'setoran')
     .reduce((acc, curr) => acc + curr.nominal, 0);
 
-  const totalPenarikan = mockStore.transaksi
+  const totalPenarikan = filteredTx
     .filter(t => t.tipe === 'penarikan')
     .reduce((acc, curr) => acc + curr.nominal, 0);
 
@@ -712,8 +775,8 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
       tahun,
       total_setoran: totalSetoran,
       total_penarikan: totalPenarikan,
-      total_transaksi_count: mockStore.transaksi.length,
-      total_prospek_count: mockStore.prospek.length,
+      total_transaksi_count: filteredTx.length,
+      total_prospek_count: mockStore.prospek.filter(p => !userId || p.user_id === userId).length,
       total_anggota_count: mockStore.nasabah.length
     }
   });

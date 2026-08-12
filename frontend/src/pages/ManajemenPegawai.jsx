@@ -18,7 +18,7 @@ export const ManajemenPegawai = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
-    nama: '', username: '', password: '', role: 'pegawai', jabatan: 'Teller/Kolektor', no_hp: '', status: 'aktif'
+    nama: '', username: '', password: '', role: 'pegawai', jabatan: 'Marketing', no_hp: '', status: 'aktif'
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,7 +43,7 @@ export const ManajemenPegawai = () => {
         setTotalPages(res.pagination?.totalPages || 1);
       }
     } catch (err) {
-      toast.error('Gagal mengambil data pegawai');
+      toast.error('Gagal mengambil data marketing');
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export const ManajemenPegawai = () => {
 
   const handleOpenCreate = () => {
     setEditingItem(null);
-    setFormData({ nama: '', username: '', password: '', role: 'pegawai', jabatan: 'Teller/Kolektor', no_hp: '', status: 'aktif' });
+    setFormData({ nama: '', username: '', password: '', role: 'pegawai', jabatan: 'Marketing', no_hp: '', status: 'aktif' });
     setIsModalOpen(true);
   };
 
@@ -62,7 +62,7 @@ export const ManajemenPegawai = () => {
       username: userItem.username,
       password: '',
       role: userItem.role,
-      jabatan: userItem.jabatan || 'Teller/Kolektor',
+      jabatan: userItem.jabatan || 'Marketing',
       no_hp: userItem.no_hp || '',
       status: userItem.status || 'aktif'
     });
@@ -269,7 +269,7 @@ export const ManajemenPegawai = () => {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none bg-white"
               >
-                <option value="pegawai">Pegawai / Teller</option>
+                <option value="pegawai">Marketing</option>
                 <option value="admin">Admin / Manager</option>
               </select>
             </div>

@@ -67,7 +67,7 @@ export const Dashboard = ({ user }) => {
             Selamat Datang, {user?.nama}!
           </h1>
           <p className="mt-2 text-sky-100 text-xs sm:text-sm leading-relaxed">
-            Kelola pencatatan harian slip setoran/penarikan, prospek nasabah, laporan kas kantor, hingga rekapitulasi pecahan uang tunai BMT Hira secara realtime.
+            Kelola pencatatan harian slip setoran/penarikan, prospek anggota, laporan kas kantor, hingga rekapitulasi pecahan uang tunai BMT Hira secara realtime.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
@@ -95,7 +95,7 @@ export const Dashboard = ({ user }) => {
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500">Total Anggota/Nasabah</p>
+            <p className="text-xs font-medium text-slate-500">Total Anggota</p>
             <h3 className="text-xl font-black text-slate-800 mt-0.5">{stats.totalNasabah}</h3>
           </div>
         </div>

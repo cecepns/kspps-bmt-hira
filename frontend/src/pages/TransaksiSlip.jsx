@@ -242,25 +242,38 @@ export const TransaksiSlip = () => {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Tanggal Transaksi</label>
-            <input
-              type="date"
-              value={formData.tanggal}
-              onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
-              required
-            />
+            <label className="block text-xs font-bold text-slate-700 mb-1">Tanggal Transaksi (TGL/BLN/THN)</label>
+            <div className="relative">
+              <input
+                type="date"
+                value={formData.tanggal}
+                onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none opacity-0 absolute inset-0 cursor-pointer z-10"
+                required
+              />
+              <div className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-mono font-bold text-slate-800 flex items-center justify-between pointer-events-none">
+                <span>
+                  {formData.tanggal
+                    ? (() => {
+                        const [yyyy, mm, dd] = formData.tanggal.split('-');
+                        return `${dd}/${mm}/${yyyy}`;
+                      })()
+                    : 'DD/MM/YYYY'}
+                </span>
+                <span className="text-slate-400 text-[10px] uppercase font-sans">Ubah Tanggal</span>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Pilih Anggota / Nasabah</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Pilih Anggota</label>
             <select
               value={formData.nasabah_id}
               onChange={(e) => setFormData({ ...formData, nasabah_id: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white"
               required
             >
-              <option value="">-- Pilih Nasabah --</option>
+              <option value="">-- Pilih Anggota --</option>
               {nasabahList.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.no_rek} - {n.nama} ({n.alamat})

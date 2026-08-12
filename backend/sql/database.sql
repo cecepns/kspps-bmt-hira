@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` VARCHAR(50) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
   `role` ENUM('admin', 'pegawai') NOT NULL DEFAULT 'pegawai',
-  `jabatan` VARCHAR(50) DEFAULT 'Teller/Kolektor',
+  `jabatan` VARCHAR(50) DEFAULT 'Marketing',
   `no_hp` VARCHAR(20) DEFAULT NULL,
   `status` ENUM('aktif', 'nonaktif') DEFAULT 'aktif',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
