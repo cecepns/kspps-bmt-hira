@@ -268,22 +268,22 @@ export const RekapLaporan = () => {
       {/* Printable Area Format Sesuai Excel Client */}
       <div id="printable-area" className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-sm space-y-8 text-slate-900">
         {/* Letterhead Header */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 flex items-center justify-center">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center flex-shrink-0">
               <img src="/logo.jpeg" alt="Logo BMT Hira" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-900">KSPPS BMT HIRA</h1>
-              <p className="text-xs font-bold text-sky-700 uppercase tracking-widest">LAPORAN HARIAN MARKETING</p>
-              <p className="text-[11px] text-slate-500">Kantor Layanan Simpan Pinjam Syariah</p>
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900">KSPPS BMT HIRA</h1>
+              <p className="text-[10px] sm:text-xs font-bold text-sky-700 uppercase tracking-widest">LAPORAN HARIAN MARKETING</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500">Kantor Layanan Simpan Pinjam Syariah</p>
             </div>
           </div>
-          <div className="text-right">
-            <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
+          <div className="text-left sm:text-right">
+            <h2 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-slate-800">
               {activeTab === 'harian' ? 'LAPORAN REKAPITULASI HARIAN' : 'LAPORAN REKAPITULASI BULANAN'}
             </h2>
-            <p className="text-xs font-semibold text-slate-700 mt-1">
+            <p className="text-xs font-semibold text-slate-700 mt-0.5">
               MARKETING: <span className="font-bold text-sky-800">{selectedUserObj ? selectedUserObj.nama : 'SEMUA MARKETING'}</span>
             </p>
             <p className="text-xs font-medium text-slate-600">
@@ -295,28 +295,28 @@ export const RekapLaporan = () => {
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-400">Menyiapkan format rekapitulasi...</div>
         ) : activeTab === 'harian' ? (
-          <div className="space-y-6 text-xs">
+          <div className="space-y-6 text-xs overflow-hidden">
             {/* SUMMARY BARIS ATAS SESUAI EXCEL CLIENT */}
             <div className="border border-slate-900 rounded-lg overflow-hidden">
               <div className="bg-slate-900 text-white p-2 font-bold uppercase text-[11px] tracking-wider">
                 TRANSAKSI KOLEKTOR / MARKETING
               </div>
-              <div className="grid grid-cols-4 divide-x divide-slate-300 text-center bg-slate-50">
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-300 text-center bg-slate-50">
                 <div className="p-2">
                   <span className="block text-[10px] font-bold text-slate-600 uppercase">JUMLAH TRANSAKSI</span>
-                  <span className="text-sm font-black text-slate-900">{rekapHarianData?.slip?.length || 0} Slip</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-900">{rekapHarianData?.slip?.length || 0} Slip</span>
                 </div>
                 <div className="p-2">
                   <span className="block text-[10px] font-bold text-slate-600 uppercase">TOTAL NOMINAL</span>
-                  <span className="text-sm font-black text-emerald-700">{formatRupiah(totalTransaksiNominal)}</span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-700">{formatRupiah(totalTransaksiNominal)}</span>
                 </div>
                 <div className="p-2">
                   <span className="block text-[10px] font-bold text-slate-600 uppercase">SELISIH</span>
-                  <span className="text-sm font-black text-slate-700">Rp 0</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-700">Rp 0</span>
                 </div>
                 <div className="p-2 bg-amber-100/80">
                   <span className="block text-[10px] font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
-                  <span className="text-base font-black text-amber-700">{totalJumlahKunjungan}</span>
+                  <span className="text-sm sm:text-base font-black text-amber-700">{totalJumlahKunjungan}</span>
                 </div>
               </div>
             </div>
@@ -326,34 +326,36 @@ export const RekapLaporan = () => {
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
                 DAFTAR ANGGOTA PENARIKAN DAN SETORAN TUNAI (SLIP)
               </h3>
-              <table className="w-full border-collapse border border-slate-300 text-left">
-                <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
-                  <tr>
-                    <th className="border border-slate-300 p-2 w-10 text-center">NO</th>
-                    <th className="border border-slate-300 p-2">REK</th>
-                    <th className="border border-slate-300 p-2">NAMA</th>
-                    <th className="border border-slate-300 p-2">ALAMAT</th>
-                    <th className="border border-slate-300 p-2 text-center">TIPE</th>
-                    <th className="border border-slate-300 p-2 text-right">NOMINAL (Rp)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rekapHarianData?.slip?.length === 0 ? (
-                    <tr><td colSpan={6} className="border border-slate-300 p-3 text-center text-slate-400">Nihil</td></tr>
-                  ) : (
-                    rekapHarianData?.slip?.map((item, idx) => (
-                      <tr key={item.id}>
-                        <td className="border border-slate-300 p-2 text-center">{idx + 1}</td>
-                        <td className="border border-slate-300 p-2 font-mono font-bold">{item.no_rek}</td>
-                        <td className="border border-slate-300 p-2 font-semibold">{item.nama}</td>
-                        <td className="border border-slate-300 p-2">{item.alamat}</td>
-                        <td className="border border-slate-300 p-2 text-center font-bold uppercase">{item.tipe}</td>
-                        <td className="border border-slate-300 p-2 text-right font-bold">{formatRupiah(item.nominal)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto border border-slate-300 rounded">
+                <table className="w-full border-collapse text-left min-w-[500px]">
+                  <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
+                    <tr>
+                      <th className="border-b border-r border-slate-300 p-2 w-10 text-center">NO</th>
+                      <th className="border-b border-r border-slate-300 p-2">REK</th>
+                      <th className="border-b border-r border-slate-300 p-2">NAMA</th>
+                      <th className="border-b border-r border-slate-300 p-2">ALAMAT</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-center">TIPE</th>
+                      <th className="border-b border-slate-300 p-2 text-right">NOMINAL (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rekapHarianData?.slip?.length === 0 ? (
+                      <tr><td colSpan={6} className="p-3 text-center text-slate-400">Nihil</td></tr>
+                    ) : (
+                      rekapHarianData?.slip?.map((item, idx) => (
+                        <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
+                          <td className="border-r border-slate-200 p-2 text-center">{idx + 1}</td>
+                          <td className="border-r border-slate-200 p-2 font-mono font-bold">{item.no_rek}</td>
+                          <td className="border-r border-slate-200 p-2 font-semibold">{item.nama}</td>
+                          <td className="border-r border-slate-200 p-2">{item.alamat}</td>
+                          <td className="border-r border-slate-200 p-2 text-center font-bold uppercase">{item.tipe}</td>
+                          <td className="p-2 text-right font-bold">{formatRupiah(item.nominal)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* 2. DAFTAR PROSPEK */}
@@ -361,90 +363,96 @@ export const RekapLaporan = () => {
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
                 DAFTAR PROSPEK
               </h3>
-              <table className="w-full border-collapse border border-slate-300 text-left">
-                <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
-                  <tr>
-                    <th className="border border-slate-300 p-2 w-10 text-center">NO</th>
-                    <th className="border border-slate-300 p-2">NAMA</th>
-                    <th className="border border-slate-300 p-2">ALAMAT/TEMPAT</th>
-                    <th className="border border-slate-300 p-2">HASIL</th>
-                    <th className="border border-slate-300 p-2">KETERANGAN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rekapHarianData?.prospek?.length === 0 ? (
-                    <tr><td colSpan={5} className="border border-slate-300 p-3 text-center text-slate-400">Nihil</td></tr>
-                  ) : (
-                    rekapHarianData?.prospek?.map((item, idx) => (
-                      <tr key={item.id}>
-                        <td className="border border-slate-300 p-2 text-center">{idx + 1}</td>
-                        <td className="border border-slate-300 p-2 font-semibold">{item.nama}</td>
-                        <td className="border border-slate-300 p-2">{item.alamat_tempat}</td>
-                        <td className="border border-slate-300 p-2 font-bold">{item.hasil}</td>
-                        <td className="border border-slate-300 p-2">{item.keterangan}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 3 & 4. ANGGOTA TIDAK TRANSAKSI & TIDAK DIKUNJUNGI */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-bold text-slate-800 uppercase mb-2">DAFTAR ANGGOTA YANG TIDAK TRANSAKSI</h4>
-                <table className="w-full border-collapse border border-slate-300 text-left text-[11px]">
-                  <thead className="bg-slate-50 font-bold uppercase">
+              <div className="overflow-x-auto border border-slate-300 rounded">
+                <table className="w-full border-collapse text-left min-w-[500px]">
+                  <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
                     <tr>
-                      <th className="border border-slate-300 p-1.5 w-8 text-center">NO</th>
-                      <th className="border border-slate-300 p-1.5">REK</th>
-                      <th className="border border-slate-300 p-1.5">NAMA</th>
-                      <th className="border border-slate-300 p-1.5">KETERANGAN</th>
+                      <th className="border-b border-r border-slate-300 p-2 w-10 text-center">NO</th>
+                      <th className="border-b border-r border-slate-300 p-2">NAMA</th>
+                      <th className="border-b border-r border-slate-300 p-2">ALAMAT/TEMPAT</th>
+                      <th className="border-b border-r border-slate-300 p-2">HASIL</th>
+                      <th className="border-b border-slate-300 p-2">KETERANGAN</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rekapHarianData?.tidak_transaksi?.length === 0 ? (
-                      <tr><td colSpan={4} className="border border-slate-300 p-2 text-center text-slate-400">Nihil</td></tr>
+                    {rekapHarianData?.prospek?.length === 0 ? (
+                      <tr><td colSpan={5} className="p-3 text-center text-slate-400">Nihil</td></tr>
                     ) : (
-                      rekapHarianData?.tidak_transaksi?.map((item, idx) => (
-                        <tr key={item.id}>
-                          <td className="border border-slate-300 p-1.5 text-center">{idx + 1}</td>
-                          <td className="border border-slate-300 p-1.5 font-mono">{item.no_rek}</td>
-                          <td className="border border-slate-300 p-1.5 font-medium">{item.nama}</td>
-                          <td className="border border-slate-300 p-1.5">{item.keterangan}</td>
+                      rekapHarianData?.prospek?.map((item, idx) => (
+                        <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
+                          <td className="border-r border-slate-200 p-2 text-center">{idx + 1}</td>
+                          <td className="border-r border-slate-200 p-2 font-semibold">{item.nama}</td>
+                          <td className="border-r border-slate-200 p-2">{item.alamat_tempat}</td>
+                          <td className="border-r border-slate-200 p-2 font-bold">{item.hasil}</td>
+                          <td className="p-2">{item.keterangan}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* 3 & 4. ANGGOTA TIDAK TRANSAKSI & TIDAK DIKUNJUNGI */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-bold text-slate-800 uppercase mb-2">DAFTAR ANGGOTA YANG TIDAK TRANSAKSI</h4>
+                <div className="overflow-x-auto border border-slate-300 rounded">
+                  <table className="w-full border-collapse text-left text-[11px] min-w-[320px]">
+                    <thead className="bg-slate-50 font-bold uppercase">
+                      <tr>
+                        <th className="border-b border-r border-slate-300 p-1.5 w-8 text-center">NO</th>
+                        <th className="border-b border-r border-slate-300 p-1.5">REK</th>
+                        <th className="border-b border-r border-slate-300 p-1.5">NAMA</th>
+                        <th className="border-b border-slate-300 p-1.5">KETERANGAN</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rekapHarianData?.tidak_transaksi?.length === 0 ? (
+                        <tr><td colSpan={4} className="p-2 text-center text-slate-400">Nihil</td></tr>
+                      ) : (
+                        rekapHarianData?.tidak_transaksi?.map((item, idx) => (
+                          <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
+                            <td className="border-r border-slate-200 p-1.5 text-center">{idx + 1}</td>
+                            <td className="border-r border-slate-200 p-1.5 font-mono">{item.no_rek}</td>
+                            <td className="border-r border-slate-200 p-1.5 font-medium">{item.nama}</td>
+                            <td className="p-1.5">{item.keterangan}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               <div>
                 <h4 className="font-bold text-slate-800 uppercase mb-2">DAFTAR ANGGOTA YANG TIDAK DIKUNJUNGI</h4>
-                <table className="w-full border-collapse border border-slate-300 text-left text-[11px]">
-                  <thead className="bg-slate-50 font-bold uppercase">
-                    <tr>
-                      <th className="border border-slate-300 p-1.5 w-8 text-center">NO</th>
-                      <th className="border border-slate-300 p-1.5">REK</th>
-                      <th className="border border-slate-300 p-1.5">NAMA</th>
-                      <th className="border border-slate-300 p-1.5">KETERANGAN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rekapHarianData?.tidak_dikunjungi?.length === 0 ? (
-                      <tr><td colSpan={4} className="border border-slate-300 p-2 text-center text-slate-400">Nihil</td></tr>
-                    ) : (
-                      rekapHarianData?.tidak_dikunjungi?.map((item, idx) => (
-                        <tr key={item.id}>
-                          <td className="border border-slate-300 p-1.5 text-center">{idx + 1}</td>
-                          <td className="border border-slate-300 p-1.5 font-mono">{item.no_rek}</td>
-                          <td className="border border-slate-300 p-1.5 font-medium">{item.nama}</td>
-                          <td className="border border-slate-300 p-1.5">{item.keterangan}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto border border-slate-300 rounded">
+                  <table className="w-full border-collapse text-left text-[11px] min-w-[320px]">
+                    <thead className="bg-slate-50 font-bold uppercase">
+                      <tr>
+                        <th className="border-b border-r border-slate-300 p-1.5 w-8 text-center">NO</th>
+                        <th className="border-b border-r border-slate-300 p-1.5">REK</th>
+                        <th className="border-b border-r border-slate-300 p-1.5">NAMA</th>
+                        <th className="border-b border-slate-300 p-1.5">KETERANGAN</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rekapHarianData?.tidak_dikunjungi?.length === 0 ? (
+                        <tr><td colSpan={4} className="p-2 text-center text-slate-400">Nihil</td></tr>
+                      ) : (
+                        rekapHarianData?.tidak_dikunjungi?.map((item, idx) => (
+                          <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
+                            <td className="border-r border-slate-200 p-1.5 text-center">{idx + 1}</td>
+                            <td className="border-r border-slate-200 p-1.5 font-mono">{item.no_rek}</td>
+                            <td className="border-r border-slate-200 p-1.5 font-medium">{item.nama}</td>
+                            <td className="p-1.5">{item.keterangan}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -453,9 +461,9 @@ export const RekapLaporan = () => {
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
                 LAPORAN HARIAN KAS
               </h3>
-              <div className="grid grid-cols-2 border border-slate-300">
+              <div className="grid grid-cols-1 sm:grid-cols-2 border border-slate-300 rounded overflow-hidden">
                 {/* Penerimaan */}
-                <div className="border-r border-slate-300">
+                <div className="border-b sm:border-b-0 sm:border-r border-slate-300">
                   <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PENERIMAAN</div>
                   <div className="p-2 space-y-1">
                     <div className="flex justify-between"><span>1. KAS KANTOR</span><span className="font-bold">{formatRupiah(rekapHarianData?.laporan_kas?.kas_kantor)}</span></div>
@@ -477,22 +485,22 @@ export const RekapLaporan = () => {
             </div>
 
             {/* 6. KAS DISETOR & LEGAL TANDA TANGAN */}
-            <div className="pt-4 border-t border-slate-300 flex justify-between items-end">
+            <div className="pt-4 border-t border-slate-300 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-6">
               <div>
-                <p className="font-bold text-slate-800">KAS DISETOR TOTAL: <span className="text-sm font-black text-sky-700">{formatRupiah(rekapHarianData?.rincian_pecahan?.jumlah_total || 0)}</span></p>
+                <p className="font-bold text-slate-800 text-center sm:text-left">KAS DISETOR TOTAL: <span className="text-sm font-black text-sky-700">{formatRupiah(rekapHarianData?.rincian_pecahan?.jumlah_total || 0)}</span></p>
               </div>
 
-              <div className="flex gap-12 text-center text-[11px] font-bold">
+              <div className="flex flex-wrap justify-center gap-8 sm:gap-12 text-center text-[11px] font-bold w-full sm:w-auto">
                 <div>
-                  <p className="mb-12">TELLER</p>
-                  <p className="underline uppercase">{rekapHarianData?.rincian_pecahan?.teller_name || 'Ahmad Teller'}</p>
+                  <p className="mb-8 sm:mb-12">MARKETING / TELLER</p>
+                  <p className="underline uppercase">{selectedUserObj ? selectedUserObj.nama : (rekapHarianData?.rincian_pecahan?.teller_name || 'Semua Marketing')}</p>
                 </div>
                 <div>
-                  <p className="mb-12">MENGETAHUI</p>
+                  <p className="mb-8 sm:mb-12">MENGETAHUI</p>
                   <p className="underline uppercase">{rekapHarianData?.rincian_pecahan?.mengetahui_name || 'Koordinator'}</p>
                 </div>
                 <div>
-                  <p className="mb-12">MANAGER CABANG</p>
+                  <p className="mb-8 sm:mb-12">MANAGER CABANG</p>
                   <p className="underline uppercase">{rekapHarianData?.rincian_pecahan?.manager_name || 'Manager'}</p>
                 </div>
               </div>
