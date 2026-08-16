@@ -49,9 +49,9 @@ export const Login = ({ onLoginSuccess }) => {
           {/* Logo Header */}
           <div className="text-center flex flex-col items-center mb-8">
             <div className="w-28 h-28 mb-4 flex items-center justify-center">
-              <img 
-                src="/logo.jpeg" 
-                alt="KSPPS BMT Hira Logo" 
+              <img
+                src="/logo.jpeg"
+                alt="KSPPS BMT Hira Logo"
                 className="w-full h-full object-contain"
               />
             </div>
@@ -128,7 +128,7 @@ export const Login = ({ onLoginSuccess }) => {
           <div className="mt-6 pt-4 border-t border-slate-100 text-center">
             <p className="text-[11px] font-medium text-slate-400 flex items-center justify-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-sky-500" />
-              Demo: admin / admin123 atau ahmad / pegawai123
+              Issued by IT KSPPS BMT HIRA
             </p>
           </div>
         </div>
