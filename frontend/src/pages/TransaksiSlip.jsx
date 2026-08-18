@@ -79,7 +79,7 @@ export const TransaksiSlip = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.nasabah_id || !formData.nominal) {
-      toast.error('Pilih Nasabah dan masukkan Nominal');
+      toast.error('Pilih Anggota dan masukkan Nominal');
       return;
     }
 
@@ -199,9 +199,8 @@ export const TransaksiSlip = () => {
                     <td className="py-3 px-4 font-bold text-slate-800">{item.nama}</td>
                     <td className="py-3 px-4 text-slate-600 max-w-xs truncate">{item.alamat}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                        item.tipe === 'setoran' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                      }`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${item.tipe === 'setoran' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                        }`}>
                         {item.tipe === 'setoran' ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
                         {item.tipe}
                       </span>
@@ -255,9 +254,9 @@ export const TransaksiSlip = () => {
                 <span>
                   {formData.tanggal
                     ? (() => {
-                        const [yyyy, mm, dd] = formData.tanggal.split('-');
-                        return `${dd}/${mm}/${yyyy}`;
-                      })()
+                      const [yyyy, mm, dd] = formData.tanggal.split('-');
+                      return `${dd}/${mm}/${yyyy}`;
+                    })()
                     : 'DD/MM/YYYY'}
                 </span>
                 <span className="text-slate-400 text-[10px] uppercase font-sans">Ubah Tanggal</span>
@@ -288,11 +287,10 @@ export const TransaksiSlip = () => {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, tipe: 'setoran' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
-                  formData.tipe === 'setoran'
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${formData.tipe === 'setoran'
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
                     : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <ArrowDownRight className="w-4 h-4" />
                 <span>SETORAN TUNAI</span>
@@ -301,11 +299,10 @@ export const TransaksiSlip = () => {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, tipe: 'penarikan' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
-                  formData.tipe === 'penarikan'
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${formData.tipe === 'penarikan'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-md'
                     : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <ArrowUpRight className="w-4 h-4" />
                 <span>PENARIKAN TUNAI</span>

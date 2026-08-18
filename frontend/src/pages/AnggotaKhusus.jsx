@@ -63,7 +63,7 @@ export const AnggotaKhusus = ({ type }) => {
     try {
       const res = await request.get(API_ENDPOINTS.NASABAH.LIST, { limit: 100 });
       if (res.success) setNasabahList(res.data || []);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSelectNasabahChange = (e) => {
@@ -245,12 +245,12 @@ export const AnggotaKhusus = ({ type }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Pilih dari Master Nasabah (Opsional Auto Fill)</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Pilih dari Master Anggota (Opsional Auto Fill)</label>
             <select
               onChange={handleSelectNasabahChange}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none bg-white mb-2"
             >
-              <option value="">-- Pilih Nasabah --</option>
+              <option value="">-- Pilih Anggota --</option>
               {nasabahList.map(n => (
                 <option key={n.id} value={n.id}>{n.no_rek} - {n.nama}</option>
               ))}
