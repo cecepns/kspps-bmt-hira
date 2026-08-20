@@ -50,7 +50,7 @@ export const DataNasabah = () => {
 
   const handleOpenCreate = () => {
     setEditingItem(null);
-    setFormData({ no_rek: `101.01.${Math.floor(100 + Math.random() * 900)}`, nama: '', alamat: '', no_hp: '', status: 'aktif' });
+    setFormData({ no_rek: `150.01.${Math.floor(100 + Math.random() * 900)}`, nama: '', alamat: '', no_hp: '', status: 'aktif' });
     setIsModalOpen(true);
   };
 

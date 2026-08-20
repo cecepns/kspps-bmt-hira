@@ -263,7 +263,7 @@ export const AnggotaKhusus = ({ type }) => {
               type="text"
               value={formData.no_rek}
               onChange={(e) => setFormData({ ...formData, no_rek: e.target.value })}
-              placeholder="Contoh: 101.01.005"
+              placeholder="Contoh: 150.01.005"
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono outline-none"
               required
             />
