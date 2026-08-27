@@ -22,54 +22,17 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Middleware Test Connection / Fallback In-Memory Storage if MySQL not active yet
-let isDbConnected = false;
-async function checkDb() {
+// Test connection on startup
+(async () => {
   try {
     const conn = await pool.getConnection();
     await conn.ping();
     conn.release();
-    isDbConnected = true;
-    console.log('✅ Connected to MySQL Database: bmt_hira');
+    console.log('✅ Connected to MySQL Database: ' + (process.env.DB_NAME || 'bmt_hira'));
   } catch (err) {
-    isDbConnected = false;
-    console.log('⚠️ MySQL not reachable yet. Operating with fallback in-memory mock storage mode.');
+    console.error('❌ Database Connection Error:', err.message);
   }
-}
-checkDb();
-
-// In-Memory mock store for development backup
-const mockStore = {
-  users: [
-    { id: 1, nama: 'Administrator BMT', username: 'admin', password: 'admin123', role: 'admin', jabatan: 'Manager Cabang', no_hp: '081234567890', status: 'aktif' },
-    { id: 2, nama: 'Ahmad Marketing', username: 'ahmad', password: 'pegawai123', role: 'pegawai', jabatan: 'Marketing', no_hp: '089876543210', status: 'aktif' }
-  ],
-  nasabah: [
-    { id: 1, no_rek: '101.01.001', nama: 'Budi Santoso', alamat: 'Jl. Merdeka No. 12, Bandung', no_hp: '0811111111', status: 'aktif' },
-    { id: 2, no_rek: '101.01.002', nama: 'Siti Aminah', alamat: 'Pasar Baru Blok A No. 4', no_hp: '0822222222', status: 'aktif' },
-    { id: 3, no_rek: '101.01.003', nama: 'Toko Berkah Raya', alamat: 'Jl. Sunda No. 45', no_hp: '0833333333', status: 'aktif' }
-  ],
-  transaksi: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], nasabah_id: 1, no_rek: '101.01.001', nama: 'Budi Santoso', alamat: 'Jl. Merdeka No. 12, Bandung', user_id: 2, tipe: 'setoran', nominal: 150000, keterangan: 'Setoran Harian Sibela' },
-    { id: 2, tanggal: new Date().toISOString().split('T')[0], nasabah_id: 2, no_rek: '101.01.002', nama: 'Siti Aminah', alamat: 'Pasar Baru Blok A No. 4', user_id: 2, tipe: 'setoran', nominal: 50000, keterangan: 'Setoran Tabungan' },
-    { id: 3, tanggal: new Date().toISOString().split('T')[0], nasabah_id: 3, no_rek: '101.01.003', nama: 'Toko Berkah Raya', alamat: 'Jl. Sunda No. 45', user_id: 2, tipe: 'penarikan', nominal: 200000, keterangan: 'Penarikan Tunai' }
-  ],
-  prospek: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], user_id: 2, nama: 'Warung Ibu Hani', alamat_tempat: 'Jl. Cihampelas No. 8', hasil: 'Tertarik', keterangan: 'Buka simpanan minggu depan' }
-  ],
-  tidak_transaksi: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], user_id: 2, no_rek: '101.01.005', nama: 'Deden Supriatna', alamat: 'Jl. Asia Afrika', keterangan: 'Toko Tutup' }
-  ],
-  tidak_dikunjungi: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], user_id: 2, no_rek: '101.01.008', nama: 'Rina Marlina', alamat: 'Kopo Sayati', keterangan: 'Hujan Deras / Akses Banjir' }
-  ],
-  laporan_kas: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], user_id: 2, kas_kantor: 500000, kolektor: 200000, penerimaan_sibela: 150000, penerimaan_lain: 0, pengeluaran_sibela: 200000, pengeluaran_pinjaman: 0, pengeluaran_operasional: 0, pengeluaran_lain: 0, total_kas_masuk: 850000, total_kas_keluar: 200000 }
-  ],
-  pecahan: [
-    { id: 1, tanggal: new Date().toISOString().split('T')[0], user_id: 2, p100k: 5, p50k: 5, p20k: 4, p10k: 10, p5k: 4, p2k: 0, p1k: 0, p500: 0, p200: 0, p100: 0, jumlah_total: 850000, selisih: 0, teller_name: 'Ahmad Teller', mengetahui_name: 'Koordinator Kolektor', manager_name: 'Administrator BMT' }
-  ]
-};
+})();
 
 // Auth middleware
 const authMiddleware = (req, res, next) => {
@@ -83,7 +46,7 @@ const authMiddleware = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: 'Token tidak valid' });
+    return res.status(401).json({ success: false, message: 'Token tidak valid atau telah kedaluwarsa' });
   }
 };
 
@@ -94,36 +57,52 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Username dan password wajib diisi' });
   }
 
-  let user = null;
-  if (isDbConnected) {
-    try {
-      const [rows] = await pool.query('SELECT * FROM users WHERE username = ? AND status = "aktif"', [username]);
-      if (rows.length > 0) user = rows[0];
-    } catch (e) { console.error(e); }
-  } else {
-    user = mockStore.users.find(u => u.username === username && u.status === 'aktif');
+  try {
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ? AND status = "aktif"', [username]);
+    if (rows.length === 0) {
+      return res.status(401).json({ success: false, message: 'Username tidak ditemukan atau akun nonaktif' });
+    }
+
+    const user = rows[0];
+    if (user.password !== password) {
+      return res.status(401).json({ success: false, message: 'Password salah' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, nama: user.nama, username: user.username, role: user.role, jabatan: user.jabatan },
+      process.env.JWT_SECRET || 'bmthira_secret_key_2026_super_secure',
+      { expiresIn: '1d' }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Login berhasil',
+      token,
+      user: {
+        id: user.id,
+        nama: user.nama,
+        username: user.username,
+        role: user.role,
+        jabatan: user.jabatan,
+        no_hp: user.no_hp
+      }
+    });
+  } catch (err) {
+    console.error('Login Error:', err);
+    return res.status(500).json({ success: false, message: 'Gagal login: ' + err.message });
   }
-
-  if (!user || user.password !== password) {
-    return res.status(401).json({ success: false, message: 'Username atau password salah' });
-  }
-
-  const token = jwt.sign(
-    { id: user.id, nama: user.nama, username: user.username, role: user.role, jabatan: user.jabatan },
-    process.env.JWT_SECRET || 'bmthira_secret_key_2026_super_secure',
-    { expiresIn: '1d' }
-  );
-
-  res.json({
-    success: true,
-    message: 'Login berhasil',
-    token,
-    user: { id: user.id, nama: user.nama, username: user.username, role: user.role, jabatan: user.jabatan, no_hp: user.no_hp }
-  });
 });
 
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
-  res.json({ success: true, data: req.user });
+  try {
+    const [rows] = await pool.query('SELECT id, nama, username, role, jabatan, no_hp, status, created_at FROM users WHERE id = ?', [req.user.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    }
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // --- USERS MANAGEMENT (Admin Only) ---
@@ -133,37 +112,25 @@ app.get('/api/users', authMiddleware, async (req, res) => {
   const search = req.query.search || '';
   const offset = (page - 1) * limit;
 
-  if (isDbConnected) {
-    try {
-      const searchPattern = `%${search}%`;
-      const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users WHERE nama LIKE ? OR username LIKE ?', [searchPattern, searchPattern]);
-      const total = countResult[0].total;
+  try {
+    const searchPattern = `%${search}%`;
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users WHERE nama LIKE ? OR username LIKE ?', [searchPattern, searchPattern]);
+    const total = countResult[0].total;
 
-      const [rows] = await pool.query('SELECT id, nama, username, role, jabatan, no_hp, status, created_at FROM users WHERE nama LIKE ? OR username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?', [searchPattern, searchPattern, limit, offset]);
+    const [rows] = await pool.query(
+      'SELECT id, nama, username, role, jabatan, no_hp, status, created_at FROM users WHERE nama LIKE ? OR username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?',
+      [searchPattern, searchPattern, limit, offset]
+    );
 
-      return res.json({
-        success: true,
-        data: rows,
-        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
-      });
-    } catch (e) {
-      console.error(e);
-    }
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    console.error('Users Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  // Fallback Mock
-  let filtered = mockStore.users.filter(u => u.nama.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase()));
-  const total = filtered.length;
-  const sliced = filtered.slice(offset, offset + limit).map(u => {
-    const { password, ...rest } = u;
-    return rest;
-  });
-
-  res.json({
-    success: true,
-    data: sliced,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
-  });
 });
 
 app.post('/api/users', authMiddleware, async (req, res) => {
@@ -172,74 +139,49 @@ app.post('/api/users', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Nama, username, dan password wajib diisi' });
   }
 
-  if (isDbConnected) {
-    try {
-      const [result] = await pool.query('INSERT INTO users (nama, username, password, role, jabatan, no_hp) VALUES (?, ?, ?, ?, ?, ?)', [nama, username, password, role || 'pegawai', jabatan || 'Teller', no_hp || '']);
-      return res.json({ success: true, message: 'Pegawai berhasil ditambahkan', id: result.insertId });
-    } catch (e) {
-      return res.status(500).json({ success: false, message: e.message });
-    }
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO users (nama, username, password, role, jabatan, no_hp) VALUES (?, ?, ?, ?, ?, ?)',
+      [nama, username, password, role || 'pegawai', jabatan || 'Marketing', no_hp || '']
+    );
+    return res.json({ success: true, message: 'Pegawai berhasil ditambahkan', id: result.insertId });
+  } catch (err) {
+    console.error('Users Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const newUser = {
-    id: mockStore.users.length + 1,
-    nama, username, password,
-    role: role || 'pegawai',
-    jabatan: jabatan || 'Teller',
-    no_hp: no_hp || '',
-    status: 'aktif'
-  };
-  mockStore.users.push(newUser);
-  res.json({ success: true, message: 'Pegawai berhasil ditambahkan', data: newUser });
 });
 
 app.put('/api/users/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { nama, username, password, role, jabatan, no_hp, status } = req.body;
 
-  if (isDbConnected) {
-    try {
-      let query = 'UPDATE users SET nama = ?, username = ?, role = ?, jabatan = ?, no_hp = ?, status = ?';
-      let params = [nama, username, role, jabatan, no_hp, status];
-      if (password) {
-        query += ', password = ?';
-        params.push(password);
-      }
-      query += ' WHERE id = ?';
-      params.push(id);
-      await pool.query(query, params);
-      return res.json({ success: true, message: 'Data pegawai diperbarui' });
-    } catch (e) {
-      return res.status(500).json({ success: false, message: e.message });
+  try {
+    let query = 'UPDATE users SET nama = ?, username = ?, role = ?, jabatan = ?, no_hp = ?, status = ?';
+    let params = [nama, username, role, jabatan, no_hp, status];
+    if (password) {
+      query += ', password = ?';
+      params.push(password);
     }
-  }
+    query += ' WHERE id = ?';
+    params.push(id);
 
-  const user = mockStore.users.find(u => u.id == id);
-  if (user) {
-    if (nama) user.nama = nama;
-    if (username) user.username = username;
-    if (password) user.password = password;
-    if (role) user.role = role;
-    if (jabatan) user.jabatan = jabatan;
-    if (no_hp !== undefined) user.no_hp = no_hp;
-    if (status) user.status = status;
+    await pool.query(query, params);
+    return res.json({ success: true, message: 'Data pegawai diperbarui' });
+  } catch (err) {
+    console.error('Users Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-  res.json({ success: true, message: 'Data pegawai diperbarui' });
 });
 
 app.delete('/api/users/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  if (isDbConnected) {
-    try {
-      await pool.query('DELETE FROM users WHERE id = ?', [id]);
-      return res.json({ success: true, message: 'Pegawai berhasil dihapus' });
-    } catch (e) {
-      return res.status(500).json({ success: false, message: e.message });
-    }
+  try {
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Pegawai berhasil dihapus' });
+  } catch (err) {
+    console.error('Users Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  mockStore.users = mockStore.users.filter(u => u.id != id);
-  res.json({ success: true, message: 'Pegawai berhasil dihapus' });
 });
 
 // --- NASABAH ENDPOINTS ---
@@ -249,74 +191,73 @@ app.get('/api/nasabah', authMiddleware, async (req, res) => {
   const search = req.query.search || '';
   const offset = (page - 1) * limit;
 
-  if (isDbConnected) {
-    try {
-      const searchPattern = `%${search}%`;
-      const [countRes] = await pool.query('SELECT COUNT(*) as total FROM nasabah WHERE nama LIKE ? OR no_rek LIKE ? OR alamat LIKE ?', [searchPattern, searchPattern, searchPattern]);
-      const total = countRes[0].total;
-      const [rows] = await pool.query('SELECT * FROM nasabah WHERE nama LIKE ? OR no_rek LIKE ? OR alamat LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?', [searchPattern, searchPattern, searchPattern, limit, offset]);
+  try {
+    const searchPattern = `%${search}%`;
+    const [countRes] = await pool.query(
+      'SELECT COUNT(*) as total FROM nasabah WHERE nama LIKE ? OR no_rek LIKE ? OR alamat LIKE ?',
+      [searchPattern, searchPattern, searchPattern]
+    );
+    const total = countRes[0].total;
 
-      return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
-    } catch (e) { console.error(e); }
+    const [rows] = await pool.query(
+      'SELECT * FROM nasabah WHERE nama LIKE ? OR no_rek LIKE ? OR alamat LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?',
+      [searchPattern, searchPattern, searchPattern, limit, offset]
+    );
+
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    console.error('Nasabah Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  let filtered = mockStore.nasabah.filter(n => n.nama.toLowerCase().includes(search.toLowerCase()) || n.no_rek.includes(search) || n.alamat.toLowerCase().includes(search.toLowerCase()));
-  const total = filtered.length;
-  const sliced = filtered.slice(offset, offset + limit);
-
-  res.json({ success: true, data: sliced, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 app.post('/api/nasabah', authMiddleware, async (req, res) => {
-  const { no_rek, nama, alamat, no_hp } = req.body;
+  const { no_rek, nama, alamat, no_hp, titik_koordinat } = req.body;
   if (!no_rek || !nama || !alamat) {
     return res.status(400).json({ success: false, message: 'No. Rekening, Nama, dan Alamat wajib diisi' });
   }
 
-  if (isDbConnected) {
-    try {
-      const [resDb] = await pool.query('INSERT INTO nasabah (no_rek, nama, alamat, no_hp) VALUES (?, ?, ?, ?)', [no_rek, nama, alamat, no_hp || '']);
-      return res.json({ success: true, message: 'Nasabah berhasil ditambahkan', id: resDb.insertId });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    const [resDb] = await pool.query(
+      'INSERT INTO nasabah (no_rek, nama, alamat, no_hp, titik_koordinat) VALUES (?, ?, ?, ?, ?)',
+      [no_rek, nama, alamat, no_hp || '', titik_koordinat || '']
+    );
+    return res.json({ success: true, message: 'Nasabah berhasil ditambahkan', id: resDb.insertId });
+  } catch (err) {
+    console.error('Nasabah Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const newNasabah = { id: mockStore.nasabah.length + 1, no_rek, nama, alamat, no_hp: no_hp || '', status: 'aktif' };
-  mockStore.nasabah.push(newNasabah);
-  res.json({ success: true, message: 'Nasabah berhasil ditambahkan', data: newNasabah });
 });
 
 app.put('/api/nasabah/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { no_rek, nama, alamat, no_hp, status } = req.body;
+  const { no_rek, nama, alamat, no_hp, status, titik_koordinat } = req.body;
 
-  if (isDbConnected) {
-    try {
-      await pool.query('UPDATE nasabah SET no_rek = ?, nama = ?, alamat = ?, no_hp = ?, status = ? WHERE id = ?', [no_rek, nama, alamat, no_hp, status, id]);
-      return res.json({ success: true, message: 'Data nasabah diperbarui' });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query(
+      'UPDATE nasabah SET no_rek = ?, nama = ?, alamat = ?, no_hp = ?, status = ?, titik_koordinat = ? WHERE id = ?',
+      [no_rek, nama, alamat, no_hp, status, titik_koordinat || '', id]
+    );
+    return res.json({ success: true, message: 'Data nasabah diperbarui' });
+  } catch (err) {
+    console.error('Nasabah Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const item = mockStore.nasabah.find(n => n.id == id);
-  if (item) {
-    if (no_rek) item.no_rek = no_rek;
-    if (nama) item.nama = nama;
-    if (alamat) item.alamat = alamat;
-    if (no_hp !== undefined) item.no_hp = no_hp;
-    if (status) item.status = status;
-  }
-  res.json({ success: true, message: 'Data nasabah diperbarui' });
 });
 
 app.delete('/api/nasabah/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  if (isDbConnected) {
-    try {
-      await pool.query('DELETE FROM nasabah WHERE id = ?', [id]);
-      return res.json({ success: true, message: 'Nasabah berhasil dihapus' });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query('DELETE FROM nasabah WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Nasabah berhasil dihapus' });
+  } catch (err) {
+    console.error('Nasabah Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-  mockStore.nasabah = mockStore.nasabah.filter(n => n.id != id);
-  res.json({ success: true, message: 'Nasabah berhasil dihapus' });
 });
 
 // --- TRANSAKSI HARIAN (SLIP SETORAN & PENARIKAN) ---
@@ -327,41 +268,32 @@ app.get('/api/transaksi', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || '';
   const offset = (page - 1) * limit;
 
-  if (isDbConnected) {
-    try {
-      let query = `
-        SELECT t.*, n.no_rek, n.nama, n.alamat, u.nama as pegawai_nama 
-        FROM transaksi_harian t
-        JOIN nasabah n ON t.nasabah_id = n.id
-        JOIN users u ON t.user_id = u.id
-        WHERE (n.nama LIKE ? OR n.no_rek LIKE ?)
-      `;
-      let params = [`%${search}%`, `%${search}%`];
-      if (tanggal) {
-        query += ' AND t.tanggal = ?';
-        params.push(tanggal);
-      }
+  try {
+    let query = `
+      SELECT t.*, n.no_rek, n.nama, n.alamat, u.nama as pegawai_nama 
+      FROM transaksi_harian t
+      JOIN nasabah n ON t.nasabah_id = n.id
+      JOIN users u ON t.user_id = u.id
+      WHERE (n.nama LIKE ? OR n.no_rek LIKE ?)
+    `;
+    let params = [`%${search}%`, `%${search}%`];
+    if (tanggal) {
+      query += ' AND t.tanggal = ?';
+      params.push(tanggal);
+    }
 
-      const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTable`, params);
-      const total = countRows[0].total;
+    const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTable`, params);
+    const total = countRows[0].total;
 
-      query += ' ORDER BY t.id DESC LIMIT ? OFFSET ?';
-      params.push(limit, offset);
+    query += ' ORDER BY t.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
-      const [rows] = await pool.query(query, params);
-      return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
-    } catch (e) { console.error(e); }
+    const [rows] = await pool.query(query, params);
+    return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('Transaksi Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  let filtered = mockStore.transaksi.filter(t => {
-    const matchSearch = t.nama.toLowerCase().includes(search.toLowerCase()) || t.no_rek.includes(search);
-    const matchTanggal = tanggal ? t.tanggal === tanggal : true;
-    return matchSearch && matchTanggal;
-  });
-  const total = filtered.length;
-  const sliced = filtered.slice(offset, offset + limit);
-
-  res.json({ success: true, data: sliced, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 app.post('/api/transaksi', authMiddleware, async (req, res) => {
@@ -371,40 +303,27 @@ app.post('/api/transaksi', authMiddleware, async (req, res) => {
   }
   const dateStr = tanggal || new Date().toISOString().split('T')[0];
 
-  if (isDbConnected) {
-    try {
-      const [resDb] = await pool.query('INSERT INTO transaksi_harian (tanggal, nasabah_id, user_id, tipe, nominal, keterangan) VALUES (?, ?, ?, ?, ?, ?)', [dateStr, nasabah_id, req.user.id, tipe, nominal, keterangan || '']);
-      return res.json({ success: true, message: 'Transaksi berhasil disimpan', id: resDb.insertId });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    const [resDb] = await pool.query(
+      'INSERT INTO transaksi_harian (tanggal, nasabah_id, user_id, tipe, nominal, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+      [dateStr, nasabah_id, req.user.id, tipe, nominal, keterangan || '']
+    );
+    return res.json({ success: true, message: 'Transaksi berhasil disimpan', id: resDb.insertId });
+  } catch (err) {
+    console.error('Transaksi Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const nasabahObj = mockStore.nasabah.find(n => n.id == nasabah_id) || { no_rek: '101.01.999', nama: 'Nasabah Umum', alamat: '-' };
-  const newTx = {
-    id: mockStore.transaksi.length + 1,
-    tanggal: dateStr,
-    nasabah_id: parseInt(nasabah_id),
-    no_rek: nasabahObj.no_rek,
-    nama: nasabahObj.nama,
-    alamat: nasabahObj.alamat,
-    user_id: req.user.id,
-    tipe,
-    nominal: parseFloat(nominal),
-    keterangan: keterangan || ''
-  };
-  mockStore.transaksi.push(newTx);
-  res.json({ success: true, message: 'Transaksi berhasil disimpan', data: newTx });
 });
 
 app.delete('/api/transaksi/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  if (isDbConnected) {
-    try {
-      await pool.query('DELETE FROM transaksi_harian WHERE id = ?', [id]);
-      return res.json({ success: true, message: 'Transaksi berhasil dihapus' });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query('DELETE FROM transaksi_harian WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Transaksi berhasil dihapus' });
+  } catch (err) {
+    console.error('Transaksi Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-  mockStore.transaksi = mockStore.transaksi.filter(t => t.id != id);
-  res.json({ success: true, message: 'Transaksi berhasil dihapus' });
 });
 
 // --- DAFTAR PROSPEK ---
@@ -415,63 +334,74 @@ app.get('/api/prospek', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || '';
   const offset = (page - 1) * limit;
 
-  if (isDbConnected) {
-    try {
-      let query = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE (p.nama LIKE ? OR p.alamat_tempat LIKE ?)';
-      let params = [`%${search}%`, `%${search}%`];
-      if (tanggal) {
-        query += ' AND p.tanggal = ?';
-        params.push(tanggal);
-      }
-      const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countT`, params);
-      const total = countRes[0].total;
+  try {
+    let query = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE (p.nama LIKE ? OR p.alamat_tempat LIKE ? OR p.no_hp LIKE ?)';
+    let params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    if (tanggal) {
+      query += ' AND p.tanggal = ?';
+      params.push(tanggal);
+    }
+    const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countT`, params);
+    const total = countRes[0].total;
 
-      query += ' ORDER BY p.id DESC LIMIT ? OFFSET ?';
-      params.push(limit, offset);
-      const [rows] = await pool.query(query, params);
-      return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
-    } catch (e) { console.error(e); }
+    query += ' ORDER BY p.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    const [rows] = await pool.query(query, params);
+    return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('Prospek Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  let filtered = mockStore.prospek.filter(p => (p.nama.toLowerCase().includes(search.toLowerCase()) || p.alamat_tempat.toLowerCase().includes(search.toLowerCase())) && (tanggal ? p.tanggal === tanggal : true));
-  const total = filtered.length;
-  const sliced = filtered.slice(offset, offset + limit);
-  res.json({ success: true, data: sliced, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 app.post('/api/prospek', authMiddleware, async (req, res) => {
-  const { tanggal, nama, alamat_tempat, hasil, keterangan } = req.body;
+  const { tanggal, nama, alamat_tempat, no_hp, hasil, keterangan } = req.body;
   if (!nama || !alamat_tempat) {
     return res.status(400).json({ success: false, message: 'Nama & Alamat Tempat wajib diisi' });
   }
   const dateStr = tanggal || new Date().toISOString().split('T')[0];
 
-  if (isDbConnected) {
-    try {
-      const [resDb] = await pool.query('INSERT INTO daftar_prospek (tanggal, user_id, nama, alamat_tempat, hasil, keterangan) VALUES (?, ?, ?, ?, ?, ?)', [dateStr, req.user.id, nama, alamat_tempat, hasil || '', keterangan || '']);
-      return res.json({ success: true, message: 'Data prospek berhasil ditambahkan', id: resDb.insertId });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    const [resDb] = await pool.query(
+      'INSERT INTO daftar_prospek (tanggal, user_id, nama, alamat_tempat, no_hp, hasil, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [dateStr, req.user.id, nama, alamat_tempat, no_hp || '', hasil || '', keterangan || '']
+    );
+    return res.json({ success: true, message: 'Data prospek berhasil ditambahkan', id: resDb.insertId });
+  } catch (err) {
+    console.error('Prospek Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
+});
 
-  const newP = { id: mockStore.prospek.length + 1, tanggal: dateStr, user_id: req.user.id, nama, alamat_tempat, hasil: hasil || '', keterangan: keterangan || '' };
-  mockStore.prospek.push(newP);
-  res.json({ success: true, message: 'Data prospek berhasil ditambahkan', data: newP });
+app.put('/api/prospek/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { tanggal, nama, alamat_tempat, no_hp, hasil, keterangan } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE daftar_prospek SET tanggal = ?, nama = ?, alamat_tempat = ?, no_hp = ?, hasil = ?, keterangan = ? WHERE id = ?',
+      [tanggal, nama, alamat_tempat, no_hp || '', hasil || '', keterangan || '', id]
+    );
+    return res.json({ success: true, message: 'Data prospek berhasil diperbarui' });
+  } catch (err) {
+    console.error('Prospek Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.delete('/api/prospek/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  if (isDbConnected) {
-    try {
-      await pool.query('DELETE FROM daftar_prospek WHERE id = ?', [id]);
-      return res.json({ success: true, message: 'Prospek berhasil dihapus' });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query('DELETE FROM daftar_prospek WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Prospek berhasil dihapus' });
+  } catch (err) {
+    console.error('Prospek Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-  mockStore.prospek = mockStore.prospek.filter(p => p.id != id);
-  res.json({ success: true, message: 'Prospek berhasil dihapus' });
 });
 
 // --- DAFTAR ANGGOTA TIDAK TRANSAKSI & TIDAK DIKUNJUNGI ---
-const createModuleEndpoints = (endpointRoute, dbTableName, storeKey, itemLabel) => {
+const createModuleEndpoints = (endpointRoute, dbTableName, itemLabel) => {
   app.get(`/api/${endpointRoute}`, authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -479,28 +409,24 @@ const createModuleEndpoints = (endpointRoute, dbTableName, storeKey, itemLabel) 
     const tanggal = req.query.tanggal || '';
     const offset = (page - 1) * limit;
 
-    if (isDbConnected) {
-      try {
-        let query = `SELECT t.*, u.nama as pegawai_nama FROM \`${dbTableName}\` t JOIN users u ON t.user_id = u.id WHERE (t.nama LIKE ? OR t.no_rek LIKE ?)`;
-        let params = [`%${search}%`, `%${search}%`];
-        if (tanggal) {
-          query += ' AND t.tanggal = ?';
-          params.push(tanggal);
-        }
-        const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTbl`, params);
-        const total = countRes[0].total;
+    try {
+      let query = `SELECT t.*, u.nama as pegawai_nama FROM \`${dbTableName}\` t JOIN users u ON t.user_id = u.id WHERE (t.nama LIKE ? OR t.no_rek LIKE ?)`;
+      let params = [`%${search}%`, `%${search}%`];
+      if (tanggal) {
+        query += ' AND t.tanggal = ?';
+        params.push(tanggal);
+      }
+      const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTbl`, params);
+      const total = countRes[0].total;
 
-        query += ' ORDER BY t.id DESC LIMIT ? OFFSET ?';
-        params.push(limit, offset);
-        const [rows] = await pool.query(query, params);
-        return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
-      } catch (e) { console.error(e); }
+      query += ' ORDER BY t.id DESC LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+      const [rows] = await pool.query(query, params);
+      return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+    } catch (err) {
+      console.error(`${endpointRoute} Get Error:`, err);
+      return res.status(500).json({ success: false, message: err.message });
     }
-
-    let filtered = mockStore[storeKey].filter(x => (x.nama.toLowerCase().includes(search.toLowerCase()) || x.no_rek.includes(search)) && (tanggal ? x.tanggal === tanggal : true));
-    const total = filtered.length;
-    const sliced = filtered.slice(offset, offset + limit);
-    res.json({ success: true, data: sliced, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   });
 
   app.post(`/api/${endpointRoute}`, authMiddleware, async (req, res) => {
@@ -510,52 +436,49 @@ const createModuleEndpoints = (endpointRoute, dbTableName, storeKey, itemLabel) 
     }
     const dateStr = tanggal || new Date().toISOString().split('T')[0];
 
-    if (isDbConnected) {
-      try {
-        const [resDb] = await pool.query(`INSERT INTO \`${dbTableName}\` (tanggal, user_id, no_rek, nama, alamat, keterangan) VALUES (?, ?, ?, ?, ?, ?)`, [dateStr, req.user.id, no_rek, nama, alamat || '', keterangan || '']);
-        return res.json({ success: true, message: `Data ${itemLabel} berhasil disimpan`, id: resDb.insertId });
-      } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+    try {
+      const [resDb] = await pool.query(
+        `INSERT INTO \`${dbTableName}\` (tanggal, user_id, no_rek, nama, alamat, keterangan) VALUES (?, ?, ?, ?, ?, ?)`,
+        [dateStr, req.user.id, no_rek, nama, alamat || '', keterangan || '']
+      );
+      return res.json({ success: true, message: `Data ${itemLabel} berhasil disimpan`, id: resDb.insertId });
+    } catch (err) {
+      console.error(`${endpointRoute} Create Error:`, err);
+      return res.status(500).json({ success: false, message: err.message });
     }
-
-    const newItem = { id: mockStore[storeKey].length + 1, tanggal: dateStr, user_id: req.user.id, no_rek, nama, alamat: alamat || '', keterangan: keterangan || '' };
-    mockStore[storeKey].push(newItem);
-    res.json({ success: true, message: `Data ${itemLabel} berhasil disimpan`, data: newItem });
   });
 
   app.delete(`/api/${endpointRoute}/:id`, authMiddleware, async (req, res) => {
     const { id } = req.params;
-    if (isDbConnected) {
-      try {
-        await pool.query(`DELETE FROM \`${dbTableName}\` WHERE id = ?`, [id]);
-        return res.json({ success: true, message: `Data ${itemLabel} berhasil dihapus` });
-      } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+    try {
+      await pool.query(`DELETE FROM \`${dbTableName}\` WHERE id = ?`, [id]);
+      return res.json({ success: true, message: `Data ${itemLabel} berhasil dihapus` });
+    } catch (err) {
+      console.error(`${endpointRoute} Delete Error:`, err);
+      return res.status(500).json({ success: false, message: err.message });
     }
-    mockStore[storeKey] = mockStore[storeKey].filter(x => x.id != id);
-    res.json({ success: true, message: `Data ${itemLabel} berhasil dihapus` });
   });
 };
 
-createModuleEndpoints('tidak-transaksi', 'tidak_transaksi', 'tidak_transaksi', 'tidak transaksi');
-createModuleEndpoints('tidak-dikunjungi', 'tidak_dikunjungi', 'tidak_dikunjungi', 'tidak dikunjungi');
+createModuleEndpoints('tidak-transaksi', 'tidak_transaksi', 'tidak transaksi');
+createModuleEndpoints('tidak-dikunjungi', 'tidak_dikunjungi', 'tidak dikunjungi');
 
 // --- LAPORAN HARIAN KAS & PECAHAN UANG TUNAI ---
 app.get('/api/laporan-kas', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
   const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  if (isDbConnected) {
-    try {
-      let q = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
-      let p = [tanggal];
-      if (userId) { q += ' AND user_id = ?'; p.push(userId); }
-      q += ' ORDER BY id DESC LIMIT 1';
-      const [rows] = await pool.query(q, p);
-      return res.json({ success: true, data: rows[0] || null });
-    } catch (e) { console.error(e); }
+  try {
+    let q = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
+    let p = [tanggal];
+    if (userId) { q += ' AND user_id = ?'; p.push(userId); }
+    q += ' ORDER BY id DESC LIMIT 1';
+    const [rows] = await pool.query(q, p);
+    return res.json({ success: true, data: rows[0] || null });
+  } catch (err) {
+    console.error('Laporan Kas Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const record = mockStore.laporan_kas.find(l => l.tanggal === tanggal && (!userId || l.user_id === userId)) || null;
-  res.json({ success: true, data: record });
 });
 
 app.post('/api/laporan-kas', authMiddleware, async (req, res) => {
@@ -565,42 +488,21 @@ app.post('/api/laporan-kas', authMiddleware, async (req, res) => {
   const total_kas_masuk = (parseFloat(kas_kantor) || 0) + (parseFloat(kolektor) || 0) + (parseFloat(penerimaan_sibela) || 0) + (parseFloat(penerimaan_lain) || 0);
   const total_kas_keluar = (parseFloat(pengeluaran_sibela) || 0) + (parseFloat(pengeluaran_pinjaman) || 0) + (parseFloat(pengeluaran_operasional) || 0) + (parseFloat(pengeluaran_lain) || 0);
 
-  if (isDbConnected) {
-    try {
-      await pool.query(
-        `INSERT INTO laporan_harian_kas (tanggal, user_id, kas_kantor, kolektor, penerimaan_sibela, penerimaan_lain, pengeluaran_sibela, pengeluaran_pinjaman, pengeluaran_operasional, pengeluaran_lain, total_kas_masuk, total_kas_keluar)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE kas_kantor=?, kolektor=?, penerimaan_sibela=?, penerimaan_lain=?, pengeluaran_sibela=?, pengeluaran_pinjaman=?, pengeluaran_operasional=?, pengeluaran_lain=?, total_kas_masuk=?, total_kas_keluar=?`,
-        [
-          dateStr, req.user.id, kas_kantor || 0, kolektor || 0, penerimaan_sibela || 0, penerimaan_lain || 0, pengeluaran_sibela || 0, pengeluaran_pinjaman || 0, pengeluaran_operasional || 0, pengeluaran_lain || 0, total_kas_masuk, total_kas_keluar,
-          kas_kantor || 0, kolektor || 0, penerimaan_sibela || 0, penerimaan_lain || 0, pengeluaran_sibela || 0, pengeluaran_pinjaman || 0, pengeluaran_operasional || 0, pengeluaran_lain || 0, total_kas_masuk, total_kas_keluar
-        ]
-      );
-      return res.json({ success: true, message: 'Laporan Harian Kas berhasil diperbarui' });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query(
+      `INSERT INTO laporan_harian_kas (tanggal, user_id, kas_kantor, kolektor, penerimaan_sibela, penerimaan_lain, pengeluaran_sibela, pengeluaran_pinjaman, pengeluaran_operasional, pengeluaran_lain, total_kas_masuk, total_kas_keluar)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE kas_kantor=?, kolektor=?, penerimaan_sibela=?, penerimaan_lain=?, pengeluaran_sibela=?, pengeluaran_pinjaman=?, pengeluaran_operasional=?, pengeluaran_lain=?, total_kas_masuk=?, total_kas_keluar=?`,
+      [
+        dateStr, req.user.id, kas_kantor || 0, kolektor || 0, penerimaan_sibela || 0, penerimaan_lain || 0, pengeluaran_sibela || 0, pengeluaran_pinjaman || 0, pengeluaran_operasional || 0, pengeluaran_lain || 0, total_kas_masuk, total_kas_keluar,
+        kas_kantor || 0, kolektor || 0, penerimaan_sibela || 0, penerimaan_lain || 0, pengeluaran_sibela || 0, pengeluaran_pinjaman || 0, pengeluaran_operasional || 0, pengeluaran_lain || 0, total_kas_masuk, total_kas_keluar
+      ]
+    );
+    return res.json({ success: true, message: 'Laporan Harian Kas berhasil diperbarui' });
+  } catch (err) {
+    console.error('Laporan Kas Save Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const existingIdx = mockStore.laporan_kas.findIndex(l => l.tanggal === dateStr && l.user_id === req.user.id);
-  const newData = {
-    id: existingIdx >= 0 ? mockStore.laporan_kas[existingIdx].id : mockStore.laporan_kas.length + 1,
-    tanggal: dateStr,
-    user_id: req.user.id,
-    kas_kantor: parseFloat(kas_kantor) || 0,
-    kolektor: parseFloat(kolektor) || 0,
-    penerimaan_sibela: parseFloat(penerimaan_sibela) || 0,
-    penerimaan_lain: parseFloat(penerimaan_lain) || 0,
-    pengeluaran_sibela: parseFloat(pengeluaran_sibela) || 0,
-    pengeluaran_pinjaman: parseFloat(pengeluaran_pinjaman) || 0,
-    pengeluaran_operasional: parseFloat(pengeluaran_operasional) || 0,
-    pengeluaran_lain: parseFloat(pengeluaran_lain) || 0,
-    total_kas_masuk,
-    total_kas_keluar
-  };
-
-  if (existingIdx >= 0) mockStore.laporan_kas[existingIdx] = newData;
-  else mockStore.laporan_kas.push(newData);
-
-  res.json({ success: true, message: 'Laporan Harian Kas berhasil diperbarui', data: newData });
 });
 
 // --- RINCIAN PECAHAN UANG KAS DISETOR ---
@@ -608,19 +510,17 @@ app.get('/api/pecahan', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
   const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  if (isDbConnected) {
-    try {
-      let q = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
-      let p = [tanggal];
-      if (userId) { q += ' AND user_id = ?'; p.push(userId); }
-      q += ' ORDER BY id DESC LIMIT 1';
-      const [rows] = await pool.query(q, p);
-      return res.json({ success: true, data: rows[0] || null });
-    } catch (e) { console.error(e); }
+  try {
+    let q = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
+    let p = [tanggal];
+    if (userId) { q += ' AND user_id = ?'; p.push(userId); }
+    q += ' ORDER BY id DESC LIMIT 1';
+    const [rows] = await pool.query(q, p);
+    return res.json({ success: true, data: rows[0] || null });
+  } catch (err) {
+    console.error('Pecahan Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const item = mockStore.pecahan.find(p => p.tanggal === tanggal && (!userId || p.user_id === userId)) || null;
-  res.json({ success: true, data: item });
 });
 
 app.post('/api/pecahan', authMiddleware, async (req, res) => {
@@ -639,43 +539,21 @@ app.post('/api/pecahan', authMiddleware, async (req, res) => {
     (parseInt(p200) || 0) * 200 +
     (parseInt(p100) || 0) * 100;
 
-  if (isDbConnected) {
-    try {
-      await pool.query(
-        `INSERT INTO rincian_pecahan (tanggal, user_id, p100k, p50k, p20k, p10k, p5k, p2k, p1k, p500, p200, p100, jumlah_total, teller_name, mengetahui_name, manager_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [dateStr, req.user.id, p100k || 0, p50k || 0, p20k || 0, p10k || 0, p5k || 0, p2k || 0, p1k || 0, p500 || 0, p200 || 0, p100 || 0, total, teller_name || req.user.nama, mengetahui_name || 'Koordinator Kolektor', manager_name || 'Administrator BMT']
-      );
-      return res.json({ success: true, message: 'Rincian Pecahan Uang Kas berhasil disimpan', total });
-    } catch (e) { return res.status(500).json({ success: false, message: e.message }); }
+  try {
+    await pool.query(
+      `INSERT INTO rincian_pecahan (tanggal, user_id, p100k, p50k, p20k, p10k, p5k, p2k, p1k, p500, p200, p100, jumlah_total, teller_name, mengetahui_name, manager_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE p100k=?, p50k=?, p20k=?, p10k=?, p5k=?, p2k=?, p1k=?, p500=?, p200=?, p100=?, jumlah_total=?, teller_name=?, mengetahui_name=?, manager_name=?`,
+      [
+        dateStr, req.user.id, p100k || 0, p50k || 0, p20k || 0, p10k || 0, p5k || 0, p2k || 0, p1k || 0, p500 || 0, p200 || 0, p100 || 0, total, teller_name || req.user.nama, mengetahui_name || 'Koordinator Kolektor', manager_name || 'Administrator BMT',
+        p100k || 0, p50k || 0, p20k || 0, p10k || 0, p5k || 0, p2k || 0, p1k || 0, p500 || 0, p200 || 0, p100 || 0, total, teller_name || req.user.nama, mengetahui_name || 'Koordinator Kolektor', manager_name || 'Administrator BMT'
+      ]
+    );
+    return res.json({ success: true, message: 'Rincian Pecahan Uang Kas berhasil disimpan', total });
+  } catch (err) {
+    console.error('Pecahan Save Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const existingIdx = mockStore.pecahan.findIndex(p => p.tanggal === dateStr);
-  const newData = {
-    id: existingIdx >= 0 ? mockStore.pecahan[existingIdx].id : mockStore.pecahan.length + 1,
-    tanggal: dateStr,
-    user_id: req.user.id,
-    p100k: parseInt(p100k) || 0,
-    p50k: parseInt(p50k) || 0,
-    p20k: parseInt(p20k) || 0,
-    p10k: parseInt(p10k) || 0,
-    p5k: parseInt(p5k) || 0,
-    p2k: parseInt(p2k) || 0,
-    p1k: parseInt(p1k) || 0,
-    p500: parseInt(p500) || 0,
-    p200: parseInt(p200) || 0,
-    p100: parseInt(p100) || 0,
-    jumlah_total: total,
-    selisih: 0,
-    teller_name: teller_name || req.user.nama,
-    mengetahui_name: mengetahui_name || 'Koordinator Kolektor',
-    manager_name: manager_name || 'Administrator BMT'
-  };
-
-  if (existingIdx >= 0) mockStore.pecahan[existingIdx] = newData;
-  else mockStore.pecahan.push(newData);
-
-  res.json({ success: true, message: 'Rincian Pecahan Uang Kas berhasil disimpan', data: newData });
 });
 
 // --- REKAPITULASI HARIAN & BULANAN LENGKAP ---
@@ -683,75 +561,55 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
   const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  if (isDbConnected) {
-    try {
-      let slipQ = 'SELECT t.*, n.no_rek, n.nama, n.alamat, u.nama as pegawai_nama FROM transaksi_harian t JOIN nasabah n ON t.nasabah_id = n.id JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
-      let slipP = [tanggal];
-      if (userId) { slipQ += ' AND t.user_id = ?'; slipP.push(userId); }
-      const [slip] = await pool.query(slipQ, slipP);
+  try {
+    let slipQ = 'SELECT t.*, n.no_rek, n.nama, n.alamat, u.nama as pegawai_nama FROM transaksi_harian t JOIN nasabah n ON t.nasabah_id = n.id JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+    let slipP = [tanggal];
+    if (userId) { slipQ += ' AND t.user_id = ?'; slipP.push(userId); }
+    const [slip] = await pool.query(slipQ, slipP);
 
-      let prospekQ = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE p.tanggal = ?';
-      let prospekP = [tanggal];
-      if (userId) { prospekQ += ' AND p.user_id = ?'; prospekP.push(userId); }
-      const [prospek] = await pool.query(prospekQ, prospekP);
+    let prospekQ = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE p.tanggal = ?';
+    let prospekP = [tanggal];
+    if (userId) { prospekQ += ' AND p.user_id = ?'; prospekP.push(userId); }
+    const [prospek] = await pool.query(prospekQ, prospekP);
 
-      let tdkTxQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_transaksi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
-      let tdkTxP = [tanggal];
-      if (userId) { tdkTxQ += ' AND t.user_id = ?'; tdkTxP.push(userId); }
-      const [tidak_transaksi] = await pool.query(tdkTxQ, tdkTxP);
+    let tdkTxQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_transaksi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+    let tdkTxP = [tanggal];
+    if (userId) { tdkTxQ += ' AND t.user_id = ?'; tdkTxP.push(userId); }
+    const [tidak_transaksi] = await pool.query(tdkTxQ, tdkTxP);
 
-      let tdkKunjungQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_dikunjungi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
-      let tdkKunjungP = [tanggal];
-      if (userId) { tdkKunjungQ += ' AND t.user_id = ?'; tdkKunjungP.push(userId); }
-      const [tidak_dikunjungi] = await pool.query(tdkKunjungQ, tdkKunjungP);
+    let tdkKunjungQ = 'SELECT t.*, u.nama as pegawai_nama FROM tidak_dikunjungi t JOIN users u ON t.user_id = u.id WHERE t.tanggal = ?';
+    let tdkKunjungP = [tanggal];
+    if (userId) { tdkKunjungQ += ' AND t.user_id = ?'; tdkKunjungP.push(userId); }
+    const [tidak_dikunjungi] = await pool.query(tdkKunjungQ, tdkKunjungP);
 
-      let kasQ = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
-      let kasP = [tanggal];
-      if (userId) { kasQ += ' AND user_id = ?'; kasP.push(userId); }
-      kasQ += ' ORDER BY id DESC LIMIT 1';
-      const [kasRows] = await pool.query(kasQ, kasP);
+    let kasQ = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
+    let kasP = [tanggal];
+    if (userId) { kasQ += ' AND user_id = ?'; kasP.push(userId); }
+    kasQ += ' ORDER BY id DESC LIMIT 1';
+    const [kasRows] = await pool.query(kasQ, kasP);
 
-      let pecahanQ = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
-      let pecahanP = [tanggal];
-      if (userId) { pecahanQ += ' AND user_id = ?'; pecahanP.push(userId); }
-      pecahanQ += ' ORDER BY id DESC LIMIT 1';
-      const [pecahanRows] = await pool.query(pecahanQ, pecahanP);
+    let pecahanQ = 'SELECT * FROM rincian_pecahan WHERE tanggal = ?';
+    let pecahanP = [tanggal];
+    if (userId) { pecahanQ += ' AND user_id = ?'; pecahanP.push(userId); }
+    pecahanQ += ' ORDER BY id DESC LIMIT 1';
+    const [pecahanRows] = await pool.query(pecahanQ, pecahanP);
 
-      return res.json({
-        success: true,
-        data: {
-          tanggal,
-          slip,
-          prospek,
-          tidak_transaksi,
-          tidak_dikunjungi,
-          laporan_kas: kasRows[0] || null,
-          rincian_pecahan: pecahanRows[0] || null
-        }
-      });
-    } catch (e) { console.error(e); }
+    return res.json({
+      success: true,
+      data: {
+        tanggal,
+        slip,
+        prospek,
+        tidak_transaksi,
+        tidak_dikunjungi,
+        laporan_kas: kasRows[0] || null,
+        rincian_pecahan: pecahanRows[0] || null
+      }
+    });
+  } catch (err) {
+    console.error('Rekap Harian Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  // Fallback mock
-  const slip = mockStore.transaksi.filter(t => t.tanggal === tanggal && (!userId || t.user_id === userId));
-  const prospek = mockStore.prospek.filter(p => p.tanggal === tanggal && (!userId || p.user_id === userId));
-  const tidak_transaksi = mockStore.tidak_transaksi.filter(x => x.tanggal === tanggal && (!userId || x.user_id === userId));
-  const tidak_dikunjungi = mockStore.tidak_dikunjungi.filter(x => x.tanggal === tanggal && (!userId || x.user_id === userId));
-  const laporan_kas = mockStore.laporan_kas.find(l => l.tanggal === tanggal && (!userId || l.user_id === userId)) || null;
-  const rincian_pecahan = mockStore.pecahan.find(p => p.tanggal === tanggal && (!userId || p.user_id === userId)) || null;
-
-  res.json({
-    success: true,
-    data: {
-      tanggal,
-      slip,
-      prospek,
-      tidak_transaksi,
-      tidak_dikunjungi,
-      laporan_kas,
-      rincian_pecahan
-    }
-  });
 });
 
 app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
@@ -759,88 +617,55 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
   const tahun = parseInt(req.query.tahun) || new Date().getFullYear();
   const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
 
-  if (isDbConnected) {
-    try {
-      let slipWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
-      let params = [bulan, tahun];
-      if (userId) { slipWhere += ' AND user_id = ?'; params.push(userId); }
+  try {
+    let slipWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    let params = [bulan, tahun];
+    if (userId) { slipWhere += ' AND user_id = ?'; params.push(userId); }
 
-      const [slipRows] = await pool.query(`SELECT tipe, nominal FROM transaksi_harian WHERE ${slipWhere}`, params);
-      const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
-      const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
-      const totalTxCount = slipRows.length;
+    const [slipRows] = await pool.query(`SELECT tipe, nominal FROM transaksi_harian WHERE ${slipWhere}`, params);
+    const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalTxCount = slipRows.length;
 
-      let pParams = [bulan, tahun];
-      let pWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
-      if (userId) { pWhere += ' AND user_id = ?'; pParams.push(userId); }
-      const [prospekRows] = await pool.query(`SELECT COUNT(*) as cnt FROM daftar_prospek WHERE ${pWhere}`, pParams);
+    let pParams = [bulan, tahun];
+    let pWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    if (userId) { pWhere += ' AND user_id = ?'; pParams.push(userId); }
+    const [prospekRows] = await pool.query(`SELECT COUNT(*) as cnt FROM daftar_prospek WHERE ${pWhere}`, pParams);
 
-      let ttParams = [bulan, tahun];
-      let ttWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
-      if (userId) { ttWhere += ' AND user_id = ?'; ttParams.push(userId); }
-      const [ttRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_transaksi WHERE ${ttWhere}`, ttParams);
+    let ttParams = [bulan, tahun];
+    let ttWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    if (userId) { ttWhere += ' AND user_id = ?'; ttParams.push(userId); }
+    const [ttRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_transaksi WHERE ${ttWhere}`, ttParams);
 
-      let tkParams = [bulan, tahun];
-      let tkWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
-      if (userId) { tkWhere += ' AND user_id = ?'; tkParams.push(userId); }
-      const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE ${tkWhere}`, tkParams);
+    let tkParams = [bulan, tahun];
+    let tkWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    if (userId) { tkWhere += ' AND user_id = ?'; tkParams.push(userId); }
+    const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE ${tkWhere}`, tkParams);
 
-      const [nasabahRows] = await pool.query('SELECT COUNT(*) as cnt FROM nasabah');
+    const [nasabahRows] = await pool.query('SELECT COUNT(*) as cnt FROM nasabah');
 
-      const prospekCount = prospekRows[0]?.cnt || 0;
-      const ttCount = ttRows[0]?.cnt || 0;
-      const tkCount = tkRows[0]?.cnt || 0;
-      const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount;
+    const prospekCount = prospekRows[0]?.cnt || 0;
+    const ttCount = ttRows[0]?.cnt || 0;
+    const tkCount = tkRows[0]?.cnt || 0;
+    const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount;
 
-      return res.json({
-        success: true,
-        data: {
-          bulan,
-          tahun,
-          total_setoran: totalSetoran,
-          total_penarikan: totalPenarikan,
-          total_transaksi_count: totalTxCount,
-          total_kunjungan_count: totalKunjungan,
-          total_prospek_count: prospekCount,
-          total_anggota_count: nasabahRows[0]?.cnt || 0
-        }
-      });
-    } catch (e) { console.error(e); }
+    return res.json({
+      success: true,
+      data: {
+        bulan,
+        tahun,
+        total_setoran: totalSetoran,
+        total_penarikan: totalPenarikan,
+        total_transaksi_count: totalTxCount,
+        total_kunjungan_count: totalKunjungan,
+        total_prospek_count: prospekCount,
+        total_anggota_count: nasabahRows[0]?.cnt || 0
+      }
+    });
+  } catch (err) {
+    console.error('Rekap Bulanan Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const isMatchingDate = (dateStr) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    return (d.getMonth() + 1) === bulan && d.getFullYear() === tahun;
-  };
-
-  const filteredTx = mockStore.transaksi.filter(t => isMatchingDate(t.tanggal) && (!userId || t.user_id === userId));
-  const totalSetoran = filteredTx
-    .filter(t => t.tipe === 'setoran')
-    .reduce((acc, curr) => acc + Number(curr.nominal), 0);
-
-  const totalPenarikan = filteredTx
-    .filter(t => t.tipe === 'penarikan')
-    .reduce((acc, curr) => acc + Number(curr.nominal), 0);
-
-  const prospekCount = mockStore.prospek.filter(p => isMatchingDate(p.tanggal) && (!userId || p.user_id === userId)).length;
-  const ttCount = mockStore.tidak_transaksi.filter(x => isMatchingDate(x.tanggal) && (!userId || x.user_id === userId)).length;
-  const tkCount = mockStore.tidak_dikunjungi.filter(x => isMatchingDate(x.tanggal) && (!userId || x.user_id === userId)).length;
-  const totalKunjungan = filteredTx.length + prospekCount + ttCount + tkCount;
-
-  res.json({
-    success: true,
-    data: {
-      bulan,
-      tahun,
-      total_setoran: totalSetoran,
-      total_penarikan: totalPenarikan,
-      total_transaksi_count: filteredTx.length,
-      total_kunjungan_count: totalKunjungan,
-      total_prospek_count: prospekCount,
-      total_anggota_count: mockStore.nasabah.length
-    }
-  });
 });
 
 app.listen(PORT, () => {

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `nasabah` (
   `nama` VARCHAR(100) NOT NULL,
   `alamat` TEXT NOT NULL,
   `no_hp` VARCHAR(20) DEFAULT NULL,
+  `titik_koordinat` VARCHAR(255) DEFAULT NULL,
   `status` ENUM('aktif', 'nonaktif') DEFAULT 'aktif',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `daftar_prospek` (
   `user_id` INT NOT NULL,
   `nama` VARCHAR(100) NOT NULL,
   `alamat_tempat` VARCHAR(255) NOT NULL,
+  `no_hp` VARCHAR(25) DEFAULT NULL,
   `hasil` VARCHAR(255) DEFAULT NULL,
   `keterangan` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -130,10 +132,10 @@ INSERT INTO `users` (`id`, `nama`, `username`, `password`, `role`, `jabatan`, `n
 (2, 'Ahmad Teller', 'ahmad', 'pegawai123', 'pegawai', 'Teller / Kolektor', '089876543210')
 ON DUPLICATE KEY UPDATE `id`=`id`;
 
-INSERT INTO `nasabah` (`id`, `no_rek`, `nama`, `alamat`, `no_hp`) VALUES
-(1, '101.01.001', 'Budi Santoso', 'Jl. Merdeka No. 12, Bandung', '0811111111'),
-(2, '101.01.002', 'Siti Aminah', 'Pasar Baru Blok A No. 4', '0822222222'),
-(3, '101.01.003', 'Toko Berkah Raya', 'Jl. Sunda No. 45', '0833333333')
+INSERT INTO `nasabah` (`id`, `no_rek`, `nama`, `alamat`, `no_hp`, `titik_koordinat`) VALUES
+(1, '101.01.001', 'Budi Santoso', 'Jl. Merdeka No. 12, Bandung', '0811111111', '-6.917464, 107.619123'),
+(2, '101.01.002', 'Siti Aminah', 'Pasar Baru Blok A No. 4', '0822222222', '-6.921345, 107.604567'),
+(3, '101.01.003', 'Toko Berkah Raya', 'Jl. Sunda No. 45', '0833333333', '-6.920123, 107.615432')
 ON DUPLICATE KEY UPDATE `id`=`id`;
 
 INSERT INTO `transaksi_harian` (`tanggal`, `nasabah_id`, `user_id`, `tipe`, `nominal`, `keterangan`) VALUES
@@ -141,8 +143,8 @@ INSERT INTO `transaksi_harian` (`tanggal`, `nasabah_id`, `user_id`, `tipe`, `nom
 (CURDATE(), 2, 2, 'setoran', 50000.00, 'Setoran Tabungan'),
 (CURDATE(), 3, 2, 'penarikan', 200000.00, 'Penarikan Tunai');
 
-INSERT INTO `daftar_prospek` (`tanggal`, `user_id`, `nama`, `alamat_tempat`, `hasil`, `keterangan`) VALUES
-(CURDATE(), 2, 'Warung Ibu Hani', 'Jl. Cihampelas No. 8', 'Tertarik', 'Buka simpanan minggu depan');
+INSERT INTO `daftar_prospek` (`tanggal`, `user_id`, `nama`, `alamat_tempat`, `no_hp`, `hasil`, `keterangan`) VALUES
+(CURDATE(), 2, 'Warung Ibu Hani', 'Jl. Cihampelas No. 8', '085728042009', 'Tertarik', 'Buka simpanan minggu depan');
 
 INSERT INTO `tidak_transaksi` (`tanggal`, `user_id`, `no_rek`, `nama`, `alamat`, `keterangan`) VALUES
 (CURDATE(), 2, '101.01.005', 'Deden Supriatna', 'Jl. Asia Afrika', 'Toko Tutup');

@@ -116,6 +116,7 @@ export const RekapLaporan = () => {
         NO: idx + 1,
         NAMA: item.nama,
         ALAMAT_TEMPAT: item.alamat_tempat,
+        NO_HP_WA: item.no_hp || '-',
         HASIL: item.hasil,
         KETERANGAN: item.keterangan || '-'
       }));
@@ -371,19 +372,21 @@ export const RekapLaporan = () => {
                       <th className="border-b border-r border-slate-300 p-2 w-10 text-center">NO</th>
                       <th className="border-b border-r border-slate-300 p-2">NAMA</th>
                       <th className="border-b border-r border-slate-300 p-2">ALAMAT/TEMPAT</th>
+                      <th className="border-b border-r border-slate-300 p-2">NO. HP / WA</th>
                       <th className="border-b border-r border-slate-300 p-2">HASIL</th>
                       <th className="border-b border-slate-300 p-2">KETERANGAN</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rekapHarianData?.prospek?.length === 0 ? (
-                      <tr><td colSpan={5} className="p-3 text-center text-slate-400">Nihil</td></tr>
+                      <tr><td colSpan={6} className="p-3 text-center text-slate-400">Nihil</td></tr>
                     ) : (
                       rekapHarianData?.prospek?.map((item, idx) => (
                         <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
                           <td className="border-r border-slate-200 p-2 text-center">{idx + 1}</td>
                           <td className="border-r border-slate-200 p-2 font-semibold">{item.nama}</td>
                           <td className="border-r border-slate-200 p-2">{item.alamat_tempat}</td>
+                          <td className="border-r border-slate-200 p-2 font-mono text-[11px]">{item.no_hp || '-'}</td>
                           <td className="border-r border-slate-200 p-2 font-bold">{item.hasil}</td>
                           <td className="p-2">{item.keterangan}</td>
                         </tr>

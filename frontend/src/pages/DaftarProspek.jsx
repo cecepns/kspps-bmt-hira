@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
-import { Plus, Search, Trash2, Users } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, Users, Phone, MessageSquare } from 'lucide-react';
 
 export const DaftarProspek = () => {
   const [data, setData] = useState([]);
@@ -17,10 +17,12 @@ export const DaftarProspek = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     tanggal: new Date().toISOString().split('T')[0],
     nama: '',
     alamat_tempat: '',
+    no_hp: '',
     hasil: '',
     keterangan: ''
   });
@@ -54,14 +56,36 @@ export const DaftarProspek = () => {
   };
 
   const handleOpenCreate = () => {
+    setEditingItem(null);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       nama: '',
       alamat_tempat: '',
+      no_hp: '',
       hasil: 'Tertarik',
       keterangan: ''
     });
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      tanggal: item.tanggal ? item.tanggal.split('T')[0] : new Date().toISOString().split('T')[0],
+      nama: item.nama || '',
+      alamat_tempat: item.alamat_tempat || '',
+      no_hp: item.no_hp || '',
+      hasil: item.hasil || '',
+      keterangan: item.keterangan || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const formatWaUrl = (phone) => {
+    if (!phone) return '#';
+    let clean = phone.replace(/[^0-9]/g, '');
+    if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+    return `https://wa.me/${clean}`;
   };
 
   const handleSubmit = async (e) => {
@@ -73,11 +97,20 @@ export const DaftarProspek = () => {
 
     setSubmitting(true);
     try {
-      const res = await request.post(API_ENDPOINTS.PROSPEK.CREATE, formData);
-      if (res.success) {
-        toast.success('Data prospek berhasil ditambahkan');
-        setIsModalOpen(false);
-        fetchProspek();
+      if (editingItem) {
+        const res = await request.put(API_ENDPOINTS.PROSPEK.UPDATE(editingItem.id), formData);
+        if (res.success) {
+          toast.success('Data prospek berhasil diperbarui');
+          setIsModalOpen(false);
+          fetchProspek();
+        }
+      } else {
+        const res = await request.post(API_ENDPOINTS.PROSPEK.CREATE, formData);
+        if (res.success) {
+          toast.success('Data prospek berhasil ditambahkan');
+          setIsModalOpen(false);
+          fetchProspek();
+        }
       }
     } catch (err) {
       toast.error(err.message || 'Gagal menyimpan prospek');
@@ -86,30 +119,30 @@ export const DaftarProspek = () => {
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id, nama) => {
     toast((t) => (
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-slate-800">Hapus data prospek ini?</p>
+        <p className="text-xs font-semibold text-slate-800">Hapus data prospek <span className="font-bold text-rose-600">{nama || 'ini'}</span>?</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={() => toast.dismiss(t.id)} className="px-2.5 py-1 bg-slate-200 text-xs rounded-lg">Batal</button>
+          <button onClick={() => toast.dismiss(t.id)} className="px-2.5 py-1 bg-slate-200 text-xs rounded-lg font-medium">Batal</button>
           <button
             onClick={async () => {
               toast.dismiss(t.id);
               try {
                 const res = await request.delete(API_ENDPOINTS.PROSPEK.DELETE(id));
                 if (res.success) {
-                  toast.success('Prospek dihapus');
+                  toast.success('Prospek berhasil dihapus');
                   fetchProspek();
                 }
               } catch (err) { toast.error('Gagal menghapus'); }
             }}
-            className="px-2.5 py-1 bg-rose-600 text-white text-xs rounded-lg"
+            className="px-2.5 py-1 bg-rose-600 text-white text-xs rounded-lg font-medium shadow-sm"
           >
             Hapus
           </button>
         </div>
       </div>
-    ));
+    ), { duration: 5000, position: 'top-center' });
   };
 
   return (
@@ -120,7 +153,7 @@ export const DaftarProspek = () => {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
-              placeholder="Cari Prospek / Tempat..."
+              placeholder="Cari Prospek, Tempat, No HP..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 focus:ring-2 focus:ring-sky-500 outline-none bg-slate-50"
@@ -166,6 +199,7 @@ export const DaftarProspek = () => {
                   <th className="py-3 px-4 w-12 text-center">NO</th>
                   <th className="py-3 px-4">NAMA PROSPEK</th>
                   <th className="py-3 px-4">ALAMAT / TEMPAT</th>
+                  <th className="py-3 px-4">NO. HANDPHONE / WA</th>
                   <th className="py-3 px-4">HASIL</th>
                   <th className="py-3 px-4">KETERANGAN</th>
                   <th className="py-3 px-4 text-right">AKSI</th>
@@ -173,20 +207,44 @@ export const DaftarProspek = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
+                  <tr key={item.id} className="hover:bg-slate-50 transition">
                     <td className="py-3 px-4 text-center text-slate-500 font-medium">{(page - 1) * limit + idx + 1}</td>
                     <td className="py-3 px-4 font-bold text-slate-800">{item.nama}</td>
                     <td className="py-3 px-4 text-slate-600">{item.alamat_tempat}</td>
+                    <td className="py-3 px-4 font-mono text-slate-700">
+                      {item.no_hp ? (
+                        <a
+                          href={formatWaUrl(item.no_hp)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-semibold transition"
+                          title="Chat via WhatsApp"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>{item.no_hp}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">-</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-semibold text-[11px]">
+                      <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-semibold text-[11px]">
                         {item.hasil || '-'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500">{item.keterangan || '-'}</td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{item.keterangan || '-'}</td>
+                    <td className="py-3 px-4 text-right space-x-1.5">
                       <button
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => handleOpenEdit(item)}
+                        className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition"
+                        title="Edit Prospek"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id, item.nama)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        title="Hapus Prospek"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -210,7 +268,7 @@ export const DaftarProspek = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Tambah Prospek Calon Anggota"
+        title={editingItem ? "Edit Data Prospek" : "Tambah Prospek Calon Anggota"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -219,18 +277,18 @@ export const DaftarProspek = () => {
               type="date"
               value={formData.tanggal}
               onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Nama Prospek/Usaha</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Nama Prospek / Usaha</label>
             <input
               type="text"
               value={formData.nama}
               onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
               placeholder="Contoh: Toko Barokah / Pak Herman"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
           </div>
@@ -240,19 +298,29 @@ export const DaftarProspek = () => {
               type="text"
               value={formData.alamat_tempat}
               onChange={(e) => setFormData({ ...formData, alamat_tempat: e.target.value })}
-              placeholder="Contoh: Kios Blok B No 12"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none"
+              placeholder="Contoh: Kios Pasar Blok B No 12"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Hasil Kunjungan/Prospek</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">No. Handphone / WhatsApp (WA)</label>
+            <input
+              type="text"
+              value={formData.no_hp}
+              onChange={(e) => setFormData({ ...formData, no_hp: e.target.value })}
+              placeholder="Contoh: 085728042009"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Hasil Kunjungan / Prospek</label>
             <input
               type="text"
               value={formData.hasil}
               onChange={(e) => setFormData({ ...formData, hasil: e.target.value })}
               placeholder="Contoh: Tertarik / Pikir-pikir / Buka Simpanan"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
             />
           </div>
           <div>
@@ -262,23 +330,23 @@ export const DaftarProspek = () => {
               onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
               rows={2}
               placeholder="Catatan hasil pembicaraan..."
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
             />
           </div>
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-medium rounded-xl"
+              className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-medium rounded-xl hover:bg-slate-200"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl"
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50"
             >
-              {submitting ? 'Menyimpan...' : 'Simpan Data Prospek'}
+              {submitting ? 'Menyimpan...' : editingItem ? 'Perbarui Data Prospek' : 'Simpan Data Prospek'}
             </button>
           </div>
         </form>
@@ -286,3 +354,4 @@ export const DaftarProspek = () => {
     </div>
   );
 };
+

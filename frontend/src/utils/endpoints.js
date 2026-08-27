@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
   PROSPEK: {
     LIST: "/prospek",
     CREATE: "/prospek",
+    UPDATE: (id) => `/prospek/${id}`,
     DELETE: (id) => `/prospek/${id}`,
   },
   TIDAK_TRANSAKSI: {
