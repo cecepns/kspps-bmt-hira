@@ -10,6 +10,7 @@ import { DataNasabah } from './pages/DataNasabah';
 import { TransaksiSlip } from './pages/TransaksiSlip';
 import { DaftarProspek } from './pages/DaftarProspek';
 import { AnggotaKhusus } from './pages/AnggotaKhusus';
+import { SurveyPembiayaan } from './pages/SurveyPembiayaan';
 import { LaporanKas } from './pages/LaporanKas';
 import { KasDisetorPecahan } from './pages/KasDisetorPecahan';
 import { RekapLaporan } from './pages/RekapLaporan';
@@ -65,6 +66,7 @@ export default function App() {
               <Route path="/prospek" element={<DaftarProspek />} />
               <Route path="/tidak-transaksi" element={<AnggotaKhusus type="tidak-transaksi" />} />
               <Route path="/tidak-dikunjungi" element={<AnggotaKhusus type="tidak-dikunjungi" />} />
+              <Route path="/survey-pembiayaan" element={<SurveyPembiayaan />} />
               <Route path="/laporan-kas" element={<LaporanKas />} />
               <Route path="/pecahan" element={<KasDisetorPecahan user={user} />} />
               <Route path="/rekap" element={<RekapLaporan />} />

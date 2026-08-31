@@ -83,7 +83,24 @@ CREATE TABLE IF NOT EXISTS `tidak_dikunjungi` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. Tabel Laporan Harian Kas (Penerimaan & Pengeluaran)
+-- 7. Tabel Survey & Penagihan Pembiayaan
+CREATE TABLE IF NOT EXISTS `survey_pembiayaan` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `tanggal` DATE NOT NULL,
+  `user_id` INT NOT NULL,
+  `nama` VARCHAR(100) NOT NULL,
+  `alamat` TEXT NOT NULL,
+  `no_hp` VARCHAR(25) DEFAULT NULL,
+  `jenis_layanan` ENUM('Survey Pembiayaan', 'Penagihan Pembiayaan') NOT NULL DEFAULT 'Survey Pembiayaan',
+  `jumlah_plafond` DECIMAL(15,2) DEFAULT 0.00,
+  `hasil_survey` TEXT DEFAULT NULL,
+  `keterangan` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_user_id` (`user_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 8. Tabel Laporan Harian Kas (Penerimaan & Pengeluaran)
 CREATE TABLE IF NOT EXISTS `laporan_harian_kas` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `tanggal` DATE NOT NULL,
@@ -102,7 +119,7 @@ CREATE TABLE IF NOT EXISTS `laporan_harian_kas` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 8. Tabel Kas Disetor (Rincian Pecahan Uang Tunai)
+-- 9. Tabel Kas Disetor (Rincian Pecahan Uang Tunai)
 CREATE TABLE IF NOT EXISTS `rincian_pecahan` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `tanggal` DATE NOT NULL,
@@ -129,7 +146,7 @@ CREATE TABLE IF NOT EXISTS `rincian_pecahan` (
 -- Seed Sample Data Initial (Password: admin123 / pegawai123 - plain or hashed demo fallback)
 INSERT INTO `users` (`id`, `nama`, `username`, `password`, `role`, `jabatan`, `no_hp`) VALUES
 (1, 'Administrator BMT', 'admin', 'admin123', 'admin', 'Manager Cabang', '081234567890'),
-(2, 'Ahmad Teller', 'ahmad', 'pegawai123', 'pegawai', 'Teller / Kolektor', '089876543210')
+(2, 'Ahmad Teller', 'ahmad', 'pegawai123', 'pegawai', 'Marketing', '089876543210')
 ON DUPLICATE KEY UPDATE `id`=`id`;
 
 INSERT INTO `nasabah` (`id`, `no_rek`, `nama`, `alamat`, `no_hp`, `titik_koordinat`) VALUES
@@ -151,6 +168,10 @@ INSERT INTO `tidak_transaksi` (`tanggal`, `user_id`, `no_rek`, `nama`, `alamat`,
 
 INSERT INTO `tidak_dikunjungi` (`tanggal`, `user_id`, `no_rek`, `nama`, `alamat`, `keterangan`) VALUES
 (CURDATE(), 2, '101.01.008', 'Rina Marlina', 'Kopo Sayati', 'Hujan Deras / Akses Banjir');
+
+INSERT INTO `survey_pembiayaan` (`tanggal`, `user_id`, `nama`, `alamat`, `no_hp`, `jenis_layanan`, `jumlah_plafond`, `hasil_survey`, `keterangan`) VALUES
+(CURDATE(), 2, 'Hj. Rohimah (Toko Sembako)', 'Pasar Baru Timur No. 15', '085728042009', 'Survey Pembiayaan', 15000000.00, 'Usaha berjalan 5 tahun, omset stabil, jaminan BPKB motor', 'Rekomendasi disetujui plafond 15jt'),
+(CURDATE(), 2, 'Pak Bambang Irawan', 'Jl. Sukajadi No. 77', '081234567891', 'Penagihan Pembiayaan', 5000000.00, 'Janji bayar tanggal 5 bulan depan', 'Kunjungan penagihan angsuran ke-3');
 
 INSERT INTO `laporan_harian_kas` (`tanggal`, `user_id`, `kas_kantor`, `kolektor`, `penerimaan_sibela`, `pengeluaran_sibela`, `total_kas_masuk`, `total_kas_keluar`) VALUES
 (CURDATE(), 2, 500000.00, 200000.00, 150000.00, 200000.00, 850000.00, 200000.00);

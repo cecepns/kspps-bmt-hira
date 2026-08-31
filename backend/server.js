@@ -22,11 +22,28 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Test connection on startup
+// Test connection on startup and ensure tables exist
 (async () => {
   try {
     const conn = await pool.getConnection();
     await conn.ping();
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`survey_pembiayaan\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`tanggal\` DATE NOT NULL,
+        \`user_id\` INT NOT NULL,
+        \`nama\` VARCHAR(100) NOT NULL,
+        \`alamat\` TEXT NOT NULL,
+        \`no_hp\` VARCHAR(25) DEFAULT NULL,
+        \`jenis_layanan\` ENUM('Survey Pembiayaan', 'Penagihan Pembiayaan') NOT NULL DEFAULT 'Survey Pembiayaan',
+        \`jumlah_plafond\` DECIMAL(15,2) DEFAULT 0.00,
+        \`hasil_survey\` TEXT DEFAULT NULL,
+        \`keterangan\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_user_id\` (\`user_id\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
     conn.release();
     console.log('✅ Connected to MySQL Database: ' + (process.env.DB_NAME || 'bmt_hira'));
   } catch (err) {
@@ -463,6 +480,85 @@ const createModuleEndpoints = (endpointRoute, dbTableName, itemLabel) => {
 createModuleEndpoints('tidak-transaksi', 'tidak_transaksi', 'tidak transaksi');
 createModuleEndpoints('tidak-dikunjungi', 'tidak_dikunjungi', 'tidak dikunjungi');
 
+// --- SURVEY & PENAGIHAN PEMBIAYAAN ---
+app.get('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || '';
+  const tanggal = req.query.tanggal || '';
+  const jenis = req.query.jenis || '';
+  const offset = (page - 1) * limit;
+
+  try {
+    let query = 'SELECT s.*, u.nama as pegawai_nama FROM survey_pembiayaan s JOIN users u ON s.user_id = u.id WHERE (s.nama LIKE ? OR s.alamat LIKE ? OR s.no_hp LIKE ?)';
+    let params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    if (tanggal) {
+      query += ' AND s.tanggal = ?';
+      params.push(tanggal);
+    }
+    if (jenis) {
+      query += ' AND s.jenis_layanan = ?';
+      params.push(jenis);
+    }
+    const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTable`, params);
+    const total = countRes[0].total;
+
+    query += ' ORDER BY s.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    const [rows] = await pool.query(query, params);
+    return res.json({ success: true, data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('Survey Pembiayaan Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
+  const { tanggal, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
+  if (!nama || !alamat) {
+    return res.status(400).json({ success: false, message: 'Nama dan Alamat wajib diisi' });
+  }
+  const dateStr = tanggal || new Date().toISOString().split('T')[0];
+
+  try {
+    const [resDb] = await pool.query(
+      'INSERT INTO survey_pembiayaan (tanggal, user_id, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [dateStr, req.user.id, nama, alamat, no_hp || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '']
+    );
+    return res.json({ success: true, message: 'Data survey/penagihan pembiayaan berhasil disimpan', id: resDb.insertId });
+  } catch (err) {
+    console.error('Survey Pembiayaan Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/survey-pembiayaan/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { tanggal, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE survey_pembiayaan SET tanggal = ?, nama = ?, alamat = ?, no_hp = ?, jenis_layanan = ?, jumlah_plafond = ?, hasil_survey = ?, keterangan = ? WHERE id = ?',
+      [tanggal, nama, alamat, no_hp || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '', id]
+    );
+    return res.json({ success: true, message: 'Data survey/penagihan pembiayaan berhasil diperbarui' });
+  } catch (err) {
+    console.error('Survey Pembiayaan Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/survey-pembiayaan/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM survey_pembiayaan WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Data survey/penagihan pembiayaan berhasil dihapus' });
+  } catch (err) {
+    console.error('Survey Pembiayaan Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // --- LAPORAN HARIAN KAS & PECAHAN UANG TUNAI ---
 app.get('/api/laporan-kas', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
@@ -582,6 +678,11 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
     if (userId) { tdkKunjungQ += ' AND t.user_id = ?'; tdkKunjungP.push(userId); }
     const [tidak_dikunjungi] = await pool.query(tdkKunjungQ, tdkKunjungP);
 
+    let surveyQ = 'SELECT s.*, u.nama as pegawai_nama FROM survey_pembiayaan s JOIN users u ON s.user_id = u.id WHERE s.tanggal = ?';
+    let surveyP = [tanggal];
+    if (userId) { surveyQ += ' AND s.user_id = ?'; surveyP.push(userId); }
+    const [survey_pembiayaan] = await pool.query(surveyQ, surveyP);
+
     let kasQ = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
     let kasP = [tanggal];
     if (userId) { kasQ += ' AND user_id = ?'; kasP.push(userId); }
@@ -602,6 +703,7 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
         prospek,
         tidak_transaksi,
         tidak_dikunjungi,
+        survey_pembiayaan,
         laporan_kas: kasRows[0] || null,
         rincian_pecahan: pecahanRows[0] || null
       }
@@ -642,12 +744,18 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
     if (userId) { tkWhere += ' AND user_id = ?'; tkParams.push(userId); }
     const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE ${tkWhere}`, tkParams);
 
+    let sParams = [bulan, tahun];
+    let sWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    if (userId) { sWhere += ' AND user_id = ?'; sParams.push(userId); }
+    const [surveyRows] = await pool.query(`SELECT COUNT(*) as cnt FROM survey_pembiayaan WHERE ${sWhere}`, sParams);
+
     const [nasabahRows] = await pool.query('SELECT COUNT(*) as cnt FROM nasabah');
 
     const prospekCount = prospekRows[0]?.cnt || 0;
     const ttCount = ttRows[0]?.cnt || 0;
     const tkCount = tkRows[0]?.cnt || 0;
-    const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount;
+    const surveyCount = surveyRows[0]?.cnt || 0;
+    const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount + surveyCount;
 
     return res.json({
       success: true,
@@ -659,6 +767,7 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
         total_transaksi_count: totalTxCount,
         total_kunjungan_count: totalKunjungan,
         total_prospek_count: prospekCount,
+        total_survey_count: surveyCount,
         total_anggota_count: nasabahRows[0]?.cnt || 0
       }
     });

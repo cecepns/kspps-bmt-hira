@@ -81,7 +81,8 @@ export const RekapLaporan = () => {
   const totalJumlahKunjungan = (rekapHarianData?.slip?.length || 0) +
     (rekapHarianData?.prospek?.length || 0) +
     (rekapHarianData?.tidak_transaksi?.length || 0) +
-    (rekapHarianData?.tidak_dikunjungi?.length || 0);
+    (rekapHarianData?.tidak_dikunjungi?.length || 0) +
+    (rekapHarianData?.survey_pembiayaan?.length || 0);
 
   const selectedUserObj = userOptions.find(u => String(u.id) === String(selectedUserId));
 
@@ -93,7 +94,8 @@ export const RekapLaporan = () => {
       const summaryData = [
         { METRIK: 'JUMLAH TRANSAKSI SLIP', NILAI: rekapHarianData?.slip?.length || 0 },
         { METRIK: 'TOTAL NOMINAL TRANSAKSI', NILAI: totalTransaksiNominal },
-        { METRIK: 'JUMLAH KUNJUNGAN', NILAI: totalJumlahKunjungan }
+        { METRIK: 'JUMLAH SURVEY / PENAGIHAN', NILAI: rekapHarianData?.survey_pembiayaan?.length || 0 },
+        { METRIK: 'JUMLAH KUNJUNGAN (TOTAL)', NILAI: totalJumlahKunjungan }
       ];
       const wsSum = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(workbook, wsSum, 'Ringkasan Kunjungan');
@@ -123,7 +125,21 @@ export const RekapLaporan = () => {
       const wsProspek = XLSX.utils.json_to_sheet(prospekData);
       XLSX.utils.book_append_sheet(workbook, wsProspek, 'Daftar Prospek');
 
-      // 3. Tidak Transaksi & Tidak Dikunjungi
+      // 3. Survey & Penagihan Pembiayaan Sheet
+      const surveyData = (rekapHarianData?.survey_pembiayaan || []).map((item, idx) => ({
+        NO: idx + 1,
+        NAMA: item.nama,
+        ALAMAT: item.alamat,
+        NO_HP_WA: item.no_hp || '-',
+        OPSI_LAYANAN: item.jenis_layanan || 'Survey Pembiayaan',
+        PLAFOND: item.jumlah_plafond || 0,
+        HASIL_SURVEY: item.hasil_survey || '-',
+        KETERANGAN: item.keterangan || '-'
+      }));
+      const wsSurvey = XLSX.utils.json_to_sheet(surveyData);
+      XLSX.utils.book_append_sheet(workbook, wsSurvey, 'Survey Pembiayaan');
+
+      // 4. Tidak Transaksi & Tidak Dikunjungi
       const tdkTxData = (rekapHarianData?.tidak_transaksi || []).map((item, idx) => ({
         NO: idx + 1,
         REK: item.no_rek,
@@ -142,7 +158,7 @@ export const RekapLaporan = () => {
       const wsTdkKunjung = XLSX.utils.json_to_sheet(tdkKunjungData);
       XLSX.utils.book_append_sheet(workbook, wsTdkKunjung, 'Tidak Dikunjungi');
 
-      // 4. Laporan Kas & Pecahan Summary
+      // 5. Laporan Kas & Pecahan Summary
       const kasInfo = [
         { KETERANGAN: 'KAS KANTOR', KAS_MASUK: rekapHarianData?.laporan_kas?.kas_kantor || 0, KAS_KELUAR: 0 },
         { KETERANGAN: 'KOLEKTOR', KAS_MASUK: rekapHarianData?.laporan_kas?.kolektor || 0, KAS_KELUAR: 0 },
@@ -160,8 +176,9 @@ export const RekapLaporan = () => {
         { KETERANGAN: 'Total Setoran Tunai', NOMINAL: rekapBulananData?.total_setoran || 0 },
         { KETERANGAN: 'Total Penarikan Tunai', NOMINAL: rekapBulananData?.total_penarikan || 0 },
         { KETERANGAN: 'Total Transaksi Slip', JUMLAH: rekapBulananData?.total_transaksi_count || 0 },
-        { KETERANGAN: 'Jumlah Kunjungan', JUMLAH: rekapBulananData?.total_kunjungan_count || 0 },
+        { KETERANGAN: 'Jumlah Kunjungan (Total)', JUMLAH: rekapBulananData?.total_kunjungan_count || 0 },
         { KETERANGAN: 'Total Calon Prospek', JUMLAH: rekapBulananData?.total_prospek_count || 0 },
+        { KETERANGAN: 'Total Survey & Penagihan', JUMLAH: rekapBulananData?.total_survey_count || 0 },
         { KETERANGAN: 'Total Anggota Registered', JUMLAH: rekapBulananData?.total_anggota_count || 0 }
       ];
       const wsBulanan = XLSX.utils.json_to_sheet(bulananRows);
@@ -397,7 +414,52 @@ export const RekapLaporan = () => {
               </div>
             </div>
 
-            {/* 3 & 4. ANGGOTA TIDAK TRANSAKSI & TIDAK DIKUNJUNGI */}
+            {/* 3. SURVEY & PENAGIHAN PEMBIAYAAN */}
+            <div>
+              <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
+                SURVEY & PENAGIHAN PEMBIAYAAN
+              </h3>
+              <div className="overflow-x-auto border border-slate-300 rounded">
+                <table className="w-full border-collapse text-left min-w-[500px]">
+                  <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
+                    <tr>
+                      <th className="border-b border-r border-slate-300 p-2 w-10 text-center">NO</th>
+                      <th className="border-b border-r border-slate-300 p-2">NAMA</th>
+                      <th className="border-b border-r border-slate-300 p-2">ALAMAT</th>
+                      <th className="border-b border-r border-slate-300 p-2">NO. HP / WA</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-center">OPSI / LAYANAN</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-right">PLAFOND (Rp)</th>
+                      <th className="border-b border-r border-slate-300 p-2">HASIL SURVEY / PENAGIHAN</th>
+                      <th className="border-b border-slate-300 p-2">KETERANGAN</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rekapHarianData?.survey_pembiayaan?.length === 0 ? (
+                      <tr><td colSpan={8} className="p-3 text-center text-slate-400">Nihil</td></tr>
+                    ) : (
+                      rekapHarianData?.survey_pembiayaan?.map((item, idx) => (
+                        <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
+                          <td className="border-r border-slate-200 p-2 text-center">{idx + 1}</td>
+                          <td className="border-r border-slate-200 p-2 font-semibold">{item.nama}</td>
+                          <td className="border-r border-slate-200 p-2">{item.alamat}</td>
+                          <td className="border-r border-slate-200 p-2 font-mono text-[11px]">{item.no_hp || '-'}</td>
+                          <td className="border-r border-slate-200 p-2 text-center font-bold uppercase text-[10px]">
+                            {item.jenis_layanan}
+                          </td>
+                          <td className="border-r border-slate-200 p-2 text-right font-bold">
+                            {formatRupiah(item.jumlah_plafond)}
+                          </td>
+                          <td className="border-r border-slate-200 p-2">{item.hasil_survey || '-'}</td>
+                          <td className="p-2">{item.keterangan || '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4 & 5. ANGGOTA TIDAK TRANSAKSI & TIDAK DIKUNJUNGI */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h4 className="font-bold text-slate-800 uppercase mb-2">DAFTAR ANGGOTA YANG TIDAK TRANSAKSI</h4>
@@ -460,7 +522,7 @@ export const RekapLaporan = () => {
               </div>
             </div>
 
-            {/* 5. LAPORAN HARIAN KAS MATRIKS */}
+            {/* 6. LAPORAN HARIAN KAS MATRIKS */}
             <div>
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
                 LAPORAN HARIAN KAS
@@ -488,7 +550,7 @@ export const RekapLaporan = () => {
               </div>
             </div>
 
-            {/* 6. KAS DISETOR & LEGAL TANDA TANGAN */}
+            {/* 7. KAS DISETOR & LEGAL TANDA TANGAN */}
             <div className="pt-4 border-t border-slate-300 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-6">
               <div>
                 <p className="font-bold text-slate-800 text-center sm:text-left">KAS DISETOR TOTAL: <span className="text-sm font-black text-sky-700">{formatRupiah(rekapHarianData?.rincian_pecahan?.jumlah_total || 0)}</span></p>
@@ -513,22 +575,26 @@ export const RekapLaporan = () => {
         ) : (
           /* Rekap Bulanan */
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">TOTAL SETORAN (BULAN INI)</span>
-                <h3 className="text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapBulananData?.total_setoran)}</h3>
+                <span className="text-xs font-semibold text-slate-500">TOTAL SETORAN</span>
+                <h3 className="text-base sm:text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapBulananData?.total_setoran)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">TOTAL PENARIKAN (BULAN INI)</span>
-                <h3 className="text-lg font-bold text-rose-700 mt-1">{formatRupiah(rekapBulananData?.total_penarikan)}</h3>
+                <span className="text-xs font-semibold text-slate-500">TOTAL PENARIKAN</span>
+                <h3 className="text-base sm:text-lg font-bold text-rose-700 mt-1">{formatRupiah(rekapBulananData?.total_penarikan)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <span className="text-xs font-semibold text-slate-500">TOTAL TRANSAKSI</span>
-                <h3 className="text-lg font-bold text-slate-800 mt-1">{rekapBulananData?.total_transaksi_count || 0} Slip</h3>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-1">{rekapBulananData?.total_transaksi_count || 0} Slip</h3>
+              </div>
+              <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
+                <span className="text-xs font-bold text-sky-800 uppercase">SURVEY PEMBIAYAAN</span>
+                <h3 className="text-base sm:text-lg font-bold text-sky-700 mt-1">{rekapBulananData?.total_survey_count || 0} Kali</h3>
               </div>
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
                 <span className="text-xs font-black text-amber-800 uppercase">JUMLAH KUNJUNGAN</span>
-                <h3 className="text-xl font-black text-amber-600 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
+                <h3 className="text-lg sm:text-xl font-black text-amber-600 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
               </div>
             </div>
           </div>

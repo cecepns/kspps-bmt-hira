@@ -36,6 +36,12 @@ export const API_ENDPOINTS = {
     CREATE: "/tidak-dikunjungi",
     DELETE: (id) => `/tidak-dikunjungi/${id}`,
   },
+  SURVEY_PEMBIAYAAN: {
+    LIST: "/survey-pembiayaan",
+    CREATE: "/survey-pembiayaan",
+    UPDATE: (id) => `/survey-pembiayaan/${id}`,
+    DELETE: (id) => `/survey-pembiayaan/${id}`,
+  },
   LAPORAN_KAS: {
     GET: "/laporan-kas",
     SAVE: "/laporan-kas",
