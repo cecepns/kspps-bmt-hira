@@ -12,6 +12,7 @@ export const API_ENDPOINTS = {
   NASABAH: {
     LIST: "/nasabah",
     CREATE: "/nasabah",
+    IMPORT_BATCH: "/nasabah/import-batch",
     UPDATE: (id) => `/nasabah/${id}`,
     DELETE: (id) => `/nasabah/${id}`,
   },

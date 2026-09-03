@@ -250,6 +250,61 @@ app.post('/api/nasabah', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/nasabah/import-batch', authMiddleware, async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : (req.body.nasabahList || req.body.data || []);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'Data anggota untuk diimport tidak boleh kosong' });
+  }
+
+  // Filter valid rows (no_rek, nama, alamat required)
+  const validItems = items.filter(item => item && item.no_rek && item.nama && item.alamat);
+  if (validItems.length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Tidak ada data valid yang dapat diimport. Pastikan kolom No. Rekening, Nama, dan Alamat terisi.' 
+    });
+  }
+
+  try {
+    const values = validItems.map(item => [
+      String(item.no_rek).trim(),
+      String(item.nama).trim(),
+      String(item.alamat).trim(),
+      item.no_hp ? String(item.no_hp).trim() : '',
+      item.titik_koordinat ? String(item.titik_koordinat).trim() : '',
+      item.status && ['aktif', 'nonaktif'].includes(String(item.status).toLowerCase()) ? String(item.status).toLowerCase() : 'aktif'
+    ]);
+
+    const sql = `
+      INSERT INTO nasabah (no_rek, nama, alamat, no_hp, titik_koordinat, status) 
+      VALUES ? 
+      ON DUPLICATE KEY UPDATE 
+        nama = VALUES(nama), 
+        alamat = VALUES(alamat), 
+        no_hp = VALUES(no_hp), 
+        titik_koordinat = VALUES(titik_koordinat),
+        status = VALUES(status)
+    `;
+
+    const [result] = await pool.query(sql, [values]);
+
+    return res.json({
+      success: true,
+      message: `Berhasil mengimport ${validItems.length} data anggota.`,
+      summary: {
+        totalReceived: items.length,
+        totalImported: validItems.length,
+        skipped: items.length - validItems.length,
+        affectedRows: result.affectedRows
+      }
+    });
+  } catch (err) {
+    console.error('Nasabah Batch Import Error:', err);
+    return res.status(500).json({ success: false, message: 'Gagal mengimport data: ' + err.message });
+  }
+});
+
+
 app.put('/api/nasabah/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { no_rek, nama, alamat, no_hp, status, titik_koordinat } = req.body;

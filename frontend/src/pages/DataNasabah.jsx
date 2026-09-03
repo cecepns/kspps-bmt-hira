@@ -1,10 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
-import { Plus, Search, Trash2, Edit, UserCheck, MapPin, Navigation, ExternalLink, Loader2 } from 'lucide-react';
+import { 
+  Plus, 
+  Search, 
+  Trash2, 
+  Edit, 
+  UserCheck, 
+  MapPin, 
+  Navigation, 
+  ExternalLink, 
+  Loader2,
+  FileSpreadsheet,
+  Download,
+  UploadCloud,
+  CheckCircle2,
+  AlertCircle,
+  FileCheck,
+  RefreshCw,
+  X
+} from 'lucide-react';
 
 export const DataNasabah = () => {
   const [data, setData] = useState([]);
@@ -15,12 +34,20 @@ export const DataNasabah = () => {
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Modal State
+  // Modal Create/Edit State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({ no_rek: '', nama: '', alamat: '', no_hp: '', titik_koordinat: '', status: 'aktif' });
   const [submitting, setSubmitting] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+
+  // Modal Import Excel State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importRows, setImportRows] = useState([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [fileError, setFileError] = useState('');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -154,6 +181,151 @@ export const DataNasabah = () => {
     ), { duration: 5000, position: 'top-center' });
   };
 
+  // --- EXCEL IMPORT LOGIC ---
+  const handleOpenImportModal = () => {
+    setImportRows([]);
+    setImportFileName('');
+    setFileError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsImportModalOpen(true);
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const wsData = [
+        ['No. Rekening', 'Nama Anggota', 'Alamat', 'No. HP (WA)', 'Titik Koordinat GPS', 'Status (aktif/nonaktif)'],
+        ['150.01.101', 'Ahmad Fauzi', 'Jl. Merdeka No. 12, Bandung', '081234567890', '-6.917464, 107.619123', 'aktif'],
+        ['150.01.102', 'Siti Nurhaliza', 'Pasar Baru Blok A No. 5', '085712345678', '-6.918230, 107.604512', 'aktif'],
+        ['150.01.103', 'Rudi Hermawan', 'Jl. Sukajadi No. 88', '081398765432', '-6.889100, 107.598200', 'aktif']
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = [
+        { wch: 18 },
+        { wch: 24 },
+        { wch: 34 },
+        { wch: 18 },
+        { wch: 28 },
+        { wch: 18 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template_Anggota');
+      XLSX.writeFile(wb, 'Template_Import_Anggota_BMT.xlsx');
+      toast.success('Template Excel berhasil diunduh');
+    } catch (err) {
+      console.error('Error generating template:', err);
+      toast.error('Gagal mengunduh template Excel');
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileError('');
+    setImportFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const firstSheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheetName];
+        const rawJson = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rawJson || rawJson.length === 0) {
+          setFileError('File Excel tidak memiliki baris data atau kosong.');
+          setImportRows([]);
+          return;
+        }
+
+        const parsed = rawJson.map((row, idx) => {
+          const findVal = (keys) => {
+            for (const k of Object.keys(row)) {
+              const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (keys.some(target => cleanK.includes(target))) {
+                return String(row[k] || '').trim();
+              }
+            }
+            return '';
+          };
+
+          const no_rek = findVal(['rek', 'rekening', 'norek', 'account', 'no']);
+          const nama = findVal(['nama', 'name', 'lengkap', 'anggota', 'nasabah']);
+          const alamat = findVal(['alamat', 'address', 'tempat', 'domisili']);
+          const no_hp = findVal(['hp', 'wa', 'phone', 'telp', 'handphone', 'whatsapp']);
+          const titik_koordinat = findVal(['koordinat', 'gps', 'lat', 'titik', 'location', 'maps']);
+          const rawStatus = findVal(['status', 'aktif']).toLowerCase();
+          const status = (rawStatus === 'nonaktif' || rawStatus === 'non aktif' || rawStatus === 'tidak aktif') ? 'nonaktif' : 'aktif';
+
+          const isValid = Boolean(no_rek && nama && alamat);
+          const errors = [];
+          if (!no_rek) errors.push('No. Rekening');
+          if (!nama) errors.push('Nama');
+          if (!alamat) errors.push('Alamat');
+
+          return {
+            rowNumber: idx + 2,
+            no_rek,
+            nama,
+            alamat,
+            no_hp,
+            titik_koordinat,
+            status,
+            isValid,
+            error: errors.length > 0 ? `Kurang: ${errors.join(', ')}` : ''
+          };
+        });
+
+        setImportRows(parsed);
+      } catch (err) {
+        console.error('Error parsing Excel file:', err);
+        setFileError('Gagal membaca file Excel. Pastikan format file valid (.xlsx, .xls, atau .csv).');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleProcessImport = async () => {
+    const validRows = importRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      toast.error('Tidak ada data anggota yang valid untuk diimport.');
+      return;
+    }
+
+    setImporting(true);
+    const toastId = toast.loading(`Mengimport ${validRows.length} data anggota...`);
+    try {
+      const res = await request.post(API_ENDPOINTS.NASABAH.IMPORT_BATCH, {
+        nasabahList: validRows.map(({ no_rek, nama, alamat, no_hp, titik_koordinat, status }) => ({
+          no_rek,
+          nama,
+          alamat,
+          no_hp,
+          titik_koordinat,
+          status
+        }))
+      });
+
+      if (res.success) {
+        toast.success(res.message || 'Import data anggota berhasil!', { id: toastId });
+        setIsImportModalOpen(false);
+        setImportRows([]);
+        setImportFileName('');
+        fetchNasabah();
+      } else {
+        toast.error(res.message || 'Gagal mengimport data', { id: toastId });
+      }
+    } catch (err) {
+      toast.error(err.message || 'Terjadi kesalahan saat mengimport', { id: toastId });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const validCount = importRows.filter(r => r.isValid).length;
+  const invalidCount = importRows.length - validCount;
+
   return (
     <div className="space-y-5">
       {/* Top Controls */}
@@ -169,13 +341,23 @@ export const DataNasabah = () => {
           />
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="w-full sm:w-auto px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md shadow-sky-600/20 transition flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Anggota</span>
-        </button>
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <button
+            onClick={handleOpenImportModal}
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Import Excel</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreate}
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md shadow-sky-600/20 transition flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Anggota</span>
+          </button>
+        </div>
       </div>
 
       {/* Table Container */}
@@ -264,7 +446,7 @@ export const DataNasabah = () => {
         onLimitChange={(l) => { setLimit(l); setPage(1); }}
       />
 
-      {/* Form Modal */}
+      {/* Form Modal (Create / Edit) */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -378,7 +560,169 @@ export const DataNasabah = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modal Import Excel */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Data Anggota dari Excel"
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-4">
+          {/* Info & Download Template Banner */}
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                Petunjuk Format File Excel
+              </h4>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                Pastikan file memiliki kolom wajib: <strong>No. Rekening</strong>, <strong>Nama Anggota</strong>, dan <strong>Alamat</strong>. Kolom No. HP, Titik Koordinat GPS, dan Status bersifat opsional.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Unduh Template Excel</span>
+            </button>
+          </div>
+
+          {/* Upload Area */}
+          <div className="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50/60 rounded-2xl p-6 text-center transition">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".xlsx, .xls, .csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="excel-file-input"
+            />
+            <label
+              htmlFor="excel-file-input"
+              className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+            >
+              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <UploadCloud className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">
+                  {importFileName ? (
+                    <span className="text-emerald-700 font-mono">{importFileName}</span>
+                  ) : (
+                    'Klik di sini untuk memilih file Excel (.xlsx / .xls / .csv)'
+                  )}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {importFileName ? 'Klik lagi jika ingin mengganti file' : 'Maksimal ukuran 5MB'}
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Error message */}
+          {fileError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span>{fileError}</span>
+            </div>
+          )}
+
+          {/* Preview Table */}
+          {importRows.length > 0 && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4 text-sky-600" />
+                    Pratinjau Data ({importRows.length} Baris)
+                  </h4>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md">
+                    {validCount} Siap Import
+                  </span>
+                  {invalidCount > 0 && (
+                    <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-md">
+                      {invalidCount} Tidak Valid
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 sticky top-0 text-slate-600 font-bold text-[11px] uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Baris</th>
+                      <th className="py-2.5 px-3">No. Rekening</th>
+                      <th className="py-2.5 px-3">Nama Anggota</th>
+                      <th className="py-2.5 px-3">Alamat</th>
+                      <th className="py-2.5 px-3">No. HP</th>
+                      <th className="py-2.5 px-3">Titik Koordinat</th>
+                      <th className="py-2.5 px-3 text-center">Status Data</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {importRows.map((row, idx) => (
+                      <tr key={idx} className={row.isValid ? 'hover:bg-slate-50' : 'bg-rose-50/40'}>
+                        <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">{row.rowNumber}</td>
+                        <td className="py-2 px-3 font-mono font-bold text-sky-700">{row.no_rek || <span className="text-rose-500 italic">Kosong</span>}</td>
+                        <td className="py-2 px-3 font-bold text-slate-800">{row.nama || <span className="text-rose-500 italic">Kosong</span>}</td>
+                        <td className="py-2 px-3 text-slate-600 max-w-xs truncate">{row.alamat || <span className="text-rose-500 italic">Kosong</span>}</td>
+                        <td className="py-2 px-3 font-mono text-slate-600">{row.no_hp || '-'}</td>
+                        <td className="py-2 px-3 text-slate-500 text-[11px] font-mono">{row.titik_koordinat || '-'}</td>
+                        <td className="py-2 px-3 text-center">
+                          {row.isValid ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Valid
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full" title={row.error}>
+                              <AlertCircle className="w-3 h-3" />
+                              {row.error}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Footer */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-medium rounded-xl hover:bg-slate-200 transition"
+            >
+              Tutup
+            </button>
+            <button
+              type="button"
+              onClick={handleProcessImport}
+              disabled={validCount === 0 || importing}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Mengimport...</span>
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Proses Import ({validCount} Data)</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
-
