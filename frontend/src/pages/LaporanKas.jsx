@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import toast from 'react-hot-toast';
-import { Wallet, Save } from 'lucide-react';
+import { Wallet, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export const LaporanKas = () => {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
@@ -20,6 +20,12 @@ export const LaporanKas = () => {
     pengeluaran_lain: 0
   });
 
+  const [collectorSummary, setCollectorSummary] = useState({
+    total_nominal: 0,
+    total_transaksi: 0,
+    count: 0
+  });
+
   useEffect(() => {
     fetchLaporanKas();
   }, [tanggal]);
@@ -27,22 +33,42 @@ export const LaporanKas = () => {
   const fetchLaporanKas = async () => {
     setLoading(true);
     try {
-      const res = await request.get(API_ENDPOINTS.LAPORAN_KAS.GET, { tanggal });
-      if (res.success && res.data) {
+      const [kasRes, collectorRes] = await Promise.all([
+        request.get(API_ENDPOINTS.LAPORAN_KAS.GET, { tanggal }),
+        request.get(API_ENDPOINTS.COLLECTOR.SUMMARY_TODAY, { tanggal })
+      ]);
+
+      const collTotal = collectorRes?.success && collectorRes?.data
+        ? Number(collectorRes.data.total_nominal || 0)
+        : 0;
+
+      if (collectorRes?.success && collectorRes?.data) {
+        setCollectorSummary(collectorRes.data);
+      } else {
+        setCollectorSummary({ total_nominal: 0, total_transaksi: 0, count: 0 });
+      }
+
+      if (kasRes.success && kasRes.data) {
+        // Jika data laporan kas sudah pernah disimpan dengan nilai kolektor > 0, gunakan nilai tersebut.
+        // Jika nilai kolektor di laporan kas masih 0 tapi ada data collector pada tanggal tersebut, otomatis auto-fill!
+        const savedKolektor = Number(kasRes.data.kolektor || 0);
+        const finalKolektor = savedKolektor > 0 ? savedKolektor : collTotal;
+
         setFormData({
-          kas_kantor: res.data.kas_kantor || 0,
-          kolektor: res.data.kolektor || 0,
-          penerimaan_sibela: res.data.penerimaan_sibela || 0,
-          penerimaan_lain: res.data.penerimaan_lain || 0,
-          pengeluaran_sibela: res.data.pengeluaran_sibela || 0,
-          pengeluaran_pinjaman: res.data.pengeluaran_pinjaman || 0,
-          pengeluaran_operasional: res.data.pengeluaran_operasional || 0,
-          pengeluaran_lain: res.data.pengeluaran_lain || 0
+          kas_kantor: kasRes.data.kas_kantor || 0,
+          kolektor: finalKolektor,
+          penerimaan_sibela: kasRes.data.penerimaan_sibela || 0,
+          penerimaan_lain: kasRes.data.penerimaan_lain || 0,
+          pengeluaran_sibela: kasRes.data.pengeluaran_sibela || 0,
+          pengeluaran_pinjaman: kasRes.data.pengeluaran_pinjaman || 0,
+          pengeluaran_operasional: kasRes.data.pengeluaran_operasional || 0,
+          pengeluaran_lain: kasRes.data.pengeluaran_lain || 0
         });
       } else {
+        // Jika belum ada laporan kas tersimpan untuk tanggal ini, nilai kolektor otomatis auto-fill dari data collector!
         setFormData({
           kas_kantor: 0,
-          kolektor: 0,
+          kolektor: collTotal,
           penerimaan_sibela: 0,
           penerimaan_lain: 0,
           pengeluaran_sibela: 0,
@@ -56,6 +82,14 @@ export const LaporanKas = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSyncCollector = () => {
+    setFormData(prev => ({
+      ...prev,
+      kolektor: collectorSummary.total_nominal || 0
+    }));
+    toast.success(`Nilai Kolektor di-fill otomatis: ${formatRupiah(collectorSummary.total_nominal || 0)}`);
   };
 
   const handleChange = (field, val) => {
@@ -136,15 +170,39 @@ export const LaporanKas = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">2. KOLEKTOR (Rp)</label>
+                <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <label className="block text-xs font-bold text-slate-800">
+                      2. KOLEKTOR (Rp)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSyncCollector}
+                      className="text-[11px] font-bold text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-lg transition inline-flex items-center gap-1 w-fit"
+                      title="Klik untuk auto-fill nilai sesuai total data collector pada tanggal ini"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Auto-Fill Total Collector</span>
+                    </button>
+                  </div>
                   <input
                     type="number"
                     value={formData.kolektor || ''}
                     onChange={(e) => handleChange('kolektor', e.target.value)}
                     placeholder="0"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                   />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5">
+                    <span>
+                      Total Data Collector: <strong className="text-amber-800">{formatRupiah(collectorSummary.total_nominal)}</strong> ({collectorSummary.total_transaksi} Trx, {collectorSummary.count} Data)
+                    </span>
+                    {Number(formData.kolektor) === Number(collectorSummary.total_nominal) && collectorSummary.total_nominal > 0 && (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Sesuai Total Collector</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div>
