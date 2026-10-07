@@ -5,6 +5,7 @@ import {
   Users,
   UserCheck,
   Receipt,
+  Banknote,
   UserX,
   UserMinus,
   ClipboardCheck,
@@ -27,6 +28,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Transaksi Slip (Penarikan/Setoran)', path: '/transaksi', icon: Receipt },
+    { label: 'Input Collector', path: '/collector', icon: Banknote },
     { label: 'Data Anggota', path: '/nasabah', icon: UserCheck },
     { label: 'Daftar Prospek', path: '/prospek', icon: Users },
     { label: 'Anggota Tidak Transaksi', path: '/tidak-transaksi', icon: UserX },

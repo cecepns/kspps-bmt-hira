@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { DataNasabah } from './pages/DataNasabah';
 import { TransaksiSlip } from './pages/TransaksiSlip';
+import { Collector } from './pages/Collector';
 import { DaftarProspek } from './pages/DaftarProspek';
 import { AnggotaKhusus } from './pages/AnggotaKhusus';
 import { SurveyPembiayaan } from './pages/SurveyPembiayaan';
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="/" element={<Dashboard user={user} />} />
               <Route path="/nasabah" element={<DataNasabah />} />
               <Route path="/transaksi" element={<TransaksiSlip />} />
+              <Route path="/collector" element={<Collector user={user} />} />
               <Route path="/prospek" element={<DaftarProspek />} />
               <Route path="/tidak-transaksi" element={<AnggotaKhusus type="tidak-transaksi" />} />
               <Route path="/tidak-dikunjungi" element={<AnggotaKhusus type="tidak-dikunjungi" />} />

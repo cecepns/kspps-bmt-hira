@@ -44,6 +44,21 @@ const pool = mysql.createPool({
         FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`transaksi_collector\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`tanggal\` DATE NOT NULL,
+        \`user_id\` INT NOT NULL,
+        \`jumlah_transaksi\` INT NOT NULL DEFAULT 0,
+        \`jumlah_nominal\` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        \`keterangan\` VARCHAR(255) DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_tanggal\` (\`tanggal\`),
+        INDEX \`idx_user_id\` (\`user_id\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
     conn.release();
     console.log('✅ Connected to MySQL Database: ' + (process.env.DB_NAME || 'bmt_hira'));
   } catch (err) {
@@ -614,6 +629,171 @@ app.delete('/api/survey-pembiayaan/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// --- TRANSAKSI COLLECTOR (INPUT COLLECTOR) ---
+app.get('/api/collector', authMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || '';
+  const tanggal = req.query.tanggal || '';
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+  const offset = (page - 1) * limit;
+
+  try {
+    let query = `
+      SELECT tc.*, u.nama as pegawai_nama, u.jabatan as pegawai_jabatan
+      FROM transaksi_collector tc
+      JOIN users u ON tc.user_id = u.id
+      WHERE 1=1
+    `;
+    let params = [];
+    if (search) {
+      query += ' AND (u.nama LIKE ? OR tc.keterangan LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (tanggal) {
+      query += ' AND tc.tanggal = ?';
+      params.push(tanggal);
+    }
+    if (userId) {
+      query += ' AND tc.user_id = ?';
+      params.push(userId);
+    }
+
+    const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM (${query}) countTable`, params);
+    const total = countRows[0].total;
+
+    query += ' ORDER BY tc.tanggal DESC, tc.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const [rows] = await pool.query(query, params);
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+      }
+    });
+  } catch (err) {
+    console.error('Collector Get Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/collector/summary-today', authMiddleware, async (req, res) => {
+  const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+
+  try {
+    let sumQ = 'SELECT COALESCE(SUM(jumlah_transaksi), 0) as total_transaksi, COALESCE(SUM(jumlah_nominal), 0) as total_nominal, COUNT(*) as count FROM transaksi_collector WHERE tanggal = ?';
+    let sumP = [tanggal];
+    if (userId) {
+      sumQ += ' AND user_id = ?';
+      sumP.push(userId);
+    }
+    const [sumRows] = await pool.query(sumQ, sumP);
+
+    let listQ = `
+      SELECT tc.*, u.nama as pegawai_nama, u.jabatan as pegawai_jabatan
+      FROM transaksi_collector tc
+      JOIN users u ON tc.user_id = u.id
+      WHERE tc.tanggal = ?
+    `;
+    let listP = [tanggal];
+    if (userId) {
+      listQ += ' AND tc.user_id = ?';
+      listP.push(userId);
+    }
+    listQ += ' ORDER BY tc.id DESC LIMIT 20';
+    const [listRows] = await pool.query(listQ, listP);
+
+    return res.json({
+      success: true,
+      data: {
+        tanggal,
+        total_transaksi: Number(sumRows[0]?.total_transaksi || 0),
+        total_nominal: Number(sumRows[0]?.total_nominal || 0),
+        count: Number(sumRows[0]?.count || 0),
+        list: listRows
+      }
+    });
+  } catch (err) {
+    console.error('Collector Summary Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/collector/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT tc.*, u.nama as pegawai_nama FROM transaksi_collector tc JOIN users u ON tc.user_id = u.id WHERE tc.id = ?`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Data collector tidak ditemukan' });
+    }
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('Collector Get Detail Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/collector', authMiddleware, async (req, res) => {
+  const { tanggal, user_id, jumlah_transaksi, jumlah_nominal, keterangan } = req.body;
+  if (jumlah_transaksi === undefined || jumlah_nominal === undefined) {
+    return res.status(400).json({ success: false, message: 'Jumlah transaksi dan Jumlah nominal wajib diisi' });
+  }
+  const dateStr = tanggal || new Date().toISOString().split('T')[0];
+  const assignedUserId = user_id || req.user.id;
+
+  try {
+    const [resDb] = await pool.query(
+      'INSERT INTO transaksi_collector (tanggal, user_id, jumlah_transaksi, jumlah_nominal, keterangan) VALUES (?, ?, ?, ?, ?)',
+      [dateStr, assignedUserId, parseInt(jumlah_transaksi) || 0, parseFloat(jumlah_nominal) || 0, keterangan || '']
+    );
+    return res.json({ success: true, message: 'Input collector berhasil disimpan', id: resDb.insertId });
+  } catch (err) {
+    console.error('Collector Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/collector/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { tanggal, user_id, jumlah_transaksi, jumlah_nominal, keterangan } = req.body;
+  if (jumlah_transaksi === undefined || jumlah_nominal === undefined) {
+    return res.status(400).json({ success: false, message: 'Jumlah transaksi dan Jumlah nominal wajib diisi' });
+  }
+  const dateStr = tanggal || new Date().toISOString().split('T')[0];
+  const assignedUserId = user_id || req.user.id;
+
+  try {
+    await pool.query(
+      'UPDATE transaksi_collector SET tanggal = ?, user_id = ?, jumlah_transaksi = ?, jumlah_nominal = ?, keterangan = ? WHERE id = ?',
+      [dateStr, assignedUserId, parseInt(jumlah_transaksi) || 0, parseFloat(jumlah_nominal) || 0, keterangan || '', id]
+    );
+    return res.json({ success: true, message: 'Data collector berhasil diperbarui' });
+  } catch (err) {
+    console.error('Collector Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/collector/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM transaksi_collector WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Data collector berhasil dihapus' });
+  } catch (err) {
+    console.error('Collector Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // --- LAPORAN HARIAN KAS & PECAHAN UANG TUNAI ---
 app.get('/api/laporan-kas', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
@@ -738,6 +918,14 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
     if (userId) { surveyQ += ' AND s.user_id = ?'; surveyP.push(userId); }
     const [survey_pembiayaan] = await pool.query(surveyQ, surveyP);
 
+    let collectorQ = 'SELECT tc.*, u.nama as pegawai_nama FROM transaksi_collector tc JOIN users u ON tc.user_id = u.id WHERE tc.tanggal = ?';
+    let collectorP = [tanggal];
+    if (userId) { collectorQ += ' AND tc.user_id = ?'; collectorP.push(userId); }
+    const [collector] = await pool.query(collectorQ, collectorP);
+
+    const collectorTotalTransaksi = collector.reduce((sum, item) => sum + Number(item.jumlah_transaksi || 0), 0);
+    const collectorTotalNominal = collector.reduce((sum, item) => sum + Number(item.jumlah_nominal || 0), 0);
+
     let kasQ = 'SELECT * FROM laporan_harian_kas WHERE tanggal = ?';
     let kasP = [tanggal];
     if (userId) { kasQ += ' AND user_id = ?'; kasP.push(userId); }
@@ -755,6 +943,11 @@ app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
       data: {
         tanggal,
         slip,
+        collector,
+        collector_summary: {
+          total_transaksi: collectorTotalTransaksi,
+          total_nominal: collectorTotalNominal
+        },
         prospek,
         tidak_transaksi,
         tidak_dikunjungi,
@@ -783,6 +976,17 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
     const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
     const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
     const totalTxCount = slipRows.length;
+
+    let cParams = [bulan, tahun];
+    let cWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
+    if (userId) { cWhere += ' AND user_id = ?'; cParams.push(userId); }
+    const [collectorMonthRows] = await pool.query(
+      `SELECT COALESCE(SUM(jumlah_transaksi), 0) as total_transaksi, COALESCE(SUM(jumlah_nominal), 0) as total_nominal, COUNT(*) as count_entries FROM transaksi_collector WHERE ${cWhere}`,
+      cParams
+    );
+
+    const collectorTotalNominal = Number(collectorMonthRows[0]?.total_nominal || 0);
+    const collectorTotalTransaksi = Number(collectorMonthRows[0]?.total_transaksi || 0);
 
     let pParams = [bulan, tahun];
     let pWhere = 'MONTH(tanggal) = ? AND YEAR(tanggal) = ?';
@@ -820,6 +1024,8 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
         total_setoran: totalSetoran,
         total_penarikan: totalPenarikan,
         total_transaksi_count: totalTxCount,
+        collector_total_nominal: collectorTotalNominal,
+        collector_total_transaksi: collectorTotalTransaksi,
         total_kunjungan_count: totalKunjungan,
         total_prospek_count: prospekCount,
         total_survey_count: surveyCount,

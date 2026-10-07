@@ -143,6 +143,21 @@ CREATE TABLE IF NOT EXISTS `rincian_pecahan` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 10. Tabel Transaksi Collector (Input Transaksi & Nominal Collector)
+CREATE TABLE IF NOT EXISTS `transaksi_collector` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `tanggal` DATE NOT NULL,
+  `user_id` INT NOT NULL,
+  `jumlah_transaksi` INT NOT NULL DEFAULT 0,
+  `jumlah_nominal` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `keterangan` VARCHAR(255) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_tanggal` (`tanggal`),
+  INDEX `idx_user_id` (`user_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Seed Sample Data Initial (Password: admin123 / pegawai123 - plain or hashed demo fallback)
 INSERT INTO `users` (`id`, `nama`, `username`, `password`, `role`, `jabatan`, `no_hp`) VALUES
 (1, 'Administrator BMT', 'admin', 'admin123', 'admin', 'Manager Cabang', '081234567890'),
@@ -178,3 +193,6 @@ INSERT INTO `laporan_harian_kas` (`tanggal`, `user_id`, `kas_kantor`, `kolektor`
 
 INSERT INTO `rincian_pecahan` (`tanggal`, `user_id`, `p100k`, `p50k`, `p20k`, `p10k`, `p5k`, `p2k`, `p1k`, `p500`, `p200`, `p100`, `jumlah_total`, `teller_name`, `mengetahui_name`, `manager_name`) VALUES
 (CURDATE(), 2, 5, 5, 4, 10, 4, 0, 0, 0, 0, 0, 850000.00, 'Ahmad Teller', 'Koordinator Kolektor', 'Administrator BMT');
+
+INSERT INTO `transaksi_collector` (`tanggal`, `user_id`, `jumlah_transaksi`, `jumlah_nominal`, `keterangan`) VALUES
+(CURDATE(), 2, 12, 1850000.00, 'Setoran & penagihan wilayah pasar');

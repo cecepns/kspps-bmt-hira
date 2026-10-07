@@ -4,7 +4,8 @@ import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
-import { Plus, Search, Trash2, Receipt, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Plus, Search, Trash2, Receipt, ArrowDownRight, ArrowUpRight, Banknote, Layers } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const TransaksiSlip = () => {
   const [data, setData] = useState([]);
@@ -130,6 +131,21 @@ export const TransaksiSlip = () => {
 
   return (
     <div className="space-y-5">
+      {/* Navigation Sub-Tabs */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/70 rounded-2xl w-fit">
+        <div className="px-4 py-2 text-xs font-bold rounded-xl bg-white text-sky-700 shadow-sm flex items-center gap-1.5">
+          <Layers className="w-4 h-4 text-sky-600" />
+          <span>Transaksi Slip (Setoran / Penarikan)</span>
+        </div>
+        <Link
+          to="/collector"
+          className="px-4 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+        >
+          <Banknote className="w-4 h-4 text-slate-500" />
+          <span>Input Collector</span>
+        </Link>
+      </div>
+
       {/* Search & Filter Header */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">

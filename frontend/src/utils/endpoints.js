@@ -21,6 +21,13 @@ export const API_ENDPOINTS = {
     CREATE: "/transaksi",
     DELETE: (id) => `/transaksi/${id}`,
   },
+  COLLECTOR: {
+    LIST: "/collector",
+    SUMMARY_TODAY: "/collector/summary-today",
+    CREATE: "/collector",
+    UPDATE: (id) => `/collector/${id}`,
+    DELETE: (id) => `/collector/${id}`,
+  },
   PROSPEK: {
     LIST: "/prospek",
     CREATE: "/prospek",

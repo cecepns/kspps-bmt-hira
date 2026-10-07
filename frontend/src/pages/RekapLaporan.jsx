@@ -78,6 +78,10 @@ export const RekapLaporan = () => {
   };
 
   const totalTransaksiNominal = (rekapHarianData?.slip || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+  const collectorNominal = Number(rekapHarianData?.collector_summary?.total_nominal || 0);
+  const collectorTransaksi = Number(rekapHarianData?.collector_summary?.total_transaksi || 0);
+  const pengendapan = collectorNominal > 0 ? (collectorNominal - totalTransaksiNominal) : 0;
+
   const totalJumlahKunjungan = (rekapHarianData?.slip?.length || 0) +
     (rekapHarianData?.prospek?.length || 0) +
     (rekapHarianData?.tidak_transaksi?.length || 0) +
@@ -93,12 +97,27 @@ export const RekapLaporan = () => {
       // Summary Sheet
       const summaryData = [
         { METRIK: 'JUMLAH TRANSAKSI SLIP', NILAI: rekapHarianData?.slip?.length || 0 },
-        { METRIK: 'TOTAL NOMINAL TRANSAKSI', NILAI: totalTransaksiNominal },
+        { METRIK: 'TOTAL NOMINAL TRANSAKSI SLIP', NILAI: totalTransaksiNominal },
+        { METRIK: 'JUMLAH TRANSAKSI COLLECTOR', NILAI: collectorTransaksi },
+        { METRIK: 'TOTAL NOMINAL COLLECTOR', NILAI: collectorNominal },
+        { METRIK: 'PENGENDAPAN (DANA MENGENDAP)', NILAI: pengendapan },
         { METRIK: 'JUMLAH SURVEY / PENAGIHAN', NILAI: rekapHarianData?.survey_pembiayaan?.length || 0 },
         { METRIK: 'JUMLAH KUNJUNGAN (TOTAL)', NILAI: totalJumlahKunjungan }
       ];
       const wsSum = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(workbook, wsSum, 'Ringkasan Kunjungan');
+
+      // 0. Input Collector Sheet
+      const collectorData = (rekapHarianData?.collector || []).map((item, idx) => ({
+        NO: idx + 1,
+        MARKETING: item.pegawai_nama || '-',
+        TANGGAL: item.tanggal ? item.tanggal.split('T')[0] : '-',
+        JUMLAH_TRANSAKSI: item.jumlah_transaksi,
+        JUMLAH_NOMINAL: item.jumlah_nominal,
+        KETERANGAN: item.keterangan || '-'
+      }));
+      const wsCollector = XLSX.utils.json_to_sheet(collectorData);
+      XLSX.utils.book_append_sheet(workbook, wsCollector, 'Input Collector');
 
       // 1. Slip Setoran/Penarikan Sheet
       const slipData = (rekapHarianData?.slip || []).map((item, idx) => ({
@@ -172,10 +191,17 @@ export const RekapLaporan = () => {
 
       XLSX.writeFile(workbook, `Rekap_Harian_BMT_Hira_${tanggal}.xlsx`);
     } else {
+      const bulananCollectorNominal = Number(rekapBulananData?.collector_total_nominal || 0);
+      const bulananCollectorTx = Number(rekapBulananData?.collector_total_transaksi || 0);
+      const bulananPengendapan = bulananCollectorNominal > 0 ? (bulananCollectorNominal - Number(rekapBulananData?.total_setoran || 0)) : 0;
+
       const bulananRows = [
         { KETERANGAN: 'Total Setoran Tunai', NOMINAL: rekapBulananData?.total_setoran || 0 },
         { KETERANGAN: 'Total Penarikan Tunai', NOMINAL: rekapBulananData?.total_penarikan || 0 },
         { KETERANGAN: 'Total Transaksi Slip', JUMLAH: rekapBulananData?.total_transaksi_count || 0 },
+        { KETERANGAN: 'Total Nominal Collector', NOMINAL: bulananCollectorNominal },
+        { KETERANGAN: 'Total Transaksi Collector', JUMLAH: bulananCollectorTx },
+        { KETERANGAN: 'Total Pengendapan (Selisih)', NOMINAL: bulananPengendapan },
         { KETERANGAN: 'Jumlah Kunjungan (Total)', JUMLAH: rekapBulananData?.total_kunjungan_count || 0 },
         { KETERANGAN: 'Total Calon Prospek', JUMLAH: rekapBulananData?.total_prospek_count || 0 },
         { KETERANGAN: 'Total Survey & Penagihan', JUMLAH: rekapBulananData?.total_survey_count || 0 },
@@ -317,26 +343,77 @@ export const RekapLaporan = () => {
           <div className="space-y-6 text-xs overflow-hidden">
             {/* SUMMARY BARIS ATAS SESUAI EXCEL CLIENT */}
             <div className="border border-slate-900 rounded-lg overflow-hidden">
-              <div className="bg-slate-900 text-white p-2 font-bold uppercase text-[11px] tracking-wider">
-                TRANSAKSI KOLEKTOR / MARKETING
+              <div className="bg-slate-900 text-white p-2 font-bold uppercase text-[11px] tracking-wider flex items-center justify-between">
+                <span>TRANSAKSI KOLEKTOR / MARKETING</span>
+                {rekapHarianData?.collector?.length > 0 && (
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-500/30">
+                    {rekapHarianData.collector.length} Input Collector
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-300 text-center bg-slate-50">
                 <div className="p-2">
                   <span className="block text-[10px] font-bold text-slate-600 uppercase">JUMLAH TRANSAKSI</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-900">{rekapHarianData?.slip?.length || 0} Slip</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-900">
+                    {collectorTransaksi > 0 ? `${collectorTransaksi} Transaksi` : `${rekapHarianData?.slip?.length || 0} Slip`}
+                  </span>
                 </div>
                 <div className="p-2">
                   <span className="block text-[10px] font-bold text-slate-600 uppercase">TOTAL NOMINAL</span>
-                  <span className="text-xs sm:text-sm font-black text-emerald-700">{formatRupiah(totalTransaksiNominal)}</span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-700">
+                    {formatRupiah(collectorNominal > 0 ? collectorNominal : totalTransaksiNominal)}
+                  </span>
                 </div>
                 <div className="p-2">
-                  <span className="block text-[10px] font-bold text-slate-600 uppercase">SELISIH</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-700">Rp 0</span>
+                  <span className="block text-[10px] font-bold text-slate-600 uppercase">PENGENDAPAN</span>
+                  <span className={`text-xs sm:text-sm font-black ${pengendapan !== 0 ? 'text-amber-700' : 'text-slate-700'}`}>
+                    {formatRupiah(pengendapan)}
+                  </span>
                 </div>
                 <div className="p-2 bg-amber-100/80">
                   <span className="block text-[10px] font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
                   <span className="text-sm sm:text-base font-black text-amber-700">{totalJumlahKunjungan}</span>
                 </div>
+              </div>
+            </div>
+
+            {/* 0. DAFTAR INPUT TRANSAKSI COLLECTOR */}
+            <div>
+              <div className="flex items-center justify-between mb-2 bg-amber-50/70 p-2 rounded border border-amber-200">
+                <h3 className="font-bold text-amber-900 uppercase tracking-wider text-xs">
+                  DAFTAR INPUT TRANSAKSI COLLECTOR
+                </h3>
+                <span className="text-[11px] font-bold text-amber-800">
+                  {rekapHarianData?.collector?.length || 0} Data ({collectorTransaksi} Transaksi - {formatRupiah(collectorNominal)})
+                </span>
+              </div>
+              <div className="overflow-x-auto border border-slate-300 rounded">
+                <table className="w-full border-collapse text-left min-w-[500px]">
+                  <thead className="bg-slate-50 text-slate-700 font-bold uppercase">
+                    <tr>
+                      <th className="border-b border-r border-slate-300 p-2 w-10 text-center">NO</th>
+                      <th className="border-b border-r border-slate-300 p-2">PETUGAS MARKETING / COLLECTOR</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-center">JUMLAH TRANSAKSI</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-right">JUMLAH NOMINAL (Rp)</th>
+                      <th className="border-b border-slate-300 p-2">KETERANGAN</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!rekapHarianData?.collector || rekapHarianData?.collector?.length === 0) ? (
+                      <tr><td colSpan={5} className="p-3 text-center text-slate-400">Nihil / Belum ada inputan collector</td></tr>
+                    ) : (
+                      rekapHarianData?.collector?.map((item, idx) => (
+                        <tr key={item.id} className="border-b border-slate-200 last:border-b-0 hover:bg-amber-50/30">
+                          <td className="border-r border-slate-200 p-2 text-center">{idx + 1}</td>
+                          <td className="border-r border-slate-200 p-2 font-semibold text-slate-800">{item.pegawai_nama || '-'}</td>
+                          <td className="border-r border-slate-200 p-2 text-center font-bold text-amber-700">{item.jumlah_transaksi} Transaksi</td>
+                          <td className="border-r border-slate-200 p-2 text-right font-bold text-emerald-700">{formatRupiah(item.jumlah_nominal)}</td>
+                          <td className="p-2 text-slate-600">{item.keterangan || '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -575,26 +652,44 @@ export const RekapLaporan = () => {
         ) : (
           /* Rekap Bulanan */
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">TOTAL SETORAN</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL SETORAN TUNAI</span>
                 <h3 className="text-base sm:text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapBulananData?.total_setoran)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">TOTAL PENARIKAN</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL PENARIKAN TUNAI</span>
                 <h3 className="text-base sm:text-lg font-bold text-rose-700 mt-1">{formatRupiah(rekapBulananData?.total_penarikan)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">TOTAL TRANSAKSI</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL TRANSAKSI SLIP</span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-1">{rekapBulananData?.total_transaksi_count || 0} Slip</h3>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <span className="text-xs font-bold text-amber-800 uppercase">TOTAL NOMINAL COLLECTOR</span>
+                <h3 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{formatRupiah(rekapBulananData?.collector_total_nominal)}</h3>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <span className="text-xs font-bold text-amber-800 uppercase">TOTAL TRANSAKSI COLLECTOR</span>
+                <h3 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{rekapBulananData?.collector_total_transaksi || 0} Transaksi</h3>
+              </div>
+              <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
+                <span className="text-xs font-bold text-sky-800 uppercase">TOTAL PENGENDAPAN</span>
+                <h3 className="text-base sm:text-lg font-bold text-sky-900 mt-1">
+                  {formatRupiah(
+                    (Number(rekapBulananData?.collector_total_nominal || 0) > 0)
+                      ? (Number(rekapBulananData?.collector_total_nominal || 0) - Number(rekapBulananData?.total_setoran || 0))
+                      : 0
+                  )}
+                </h3>
               </div>
               <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
                 <span className="text-xs font-bold text-sky-800 uppercase">SURVEY PEMBIAYAAN</span>
                 <h3 className="text-base sm:text-lg font-bold text-sky-700 mt-1">{rekapBulananData?.total_survey_count || 0} Kali</h3>
               </div>
-              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
-                <span className="text-xs font-black text-amber-800 uppercase">JUMLAH KUNJUNGAN</span>
-                <h3 className="text-lg sm:text-xl font-black text-amber-600 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
+              <div className="bg-amber-100/70 p-4 rounded-xl border border-amber-300">
+                <span className="text-xs font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
+                <h3 className="text-lg sm:text-xl font-black text-amber-700 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
               </div>
             </div>
           </div>
