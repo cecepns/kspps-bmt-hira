@@ -5,13 +5,14 @@ import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Edit, Users, Phone, MessageSquare } from 'lucide-react';
+import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const DaftarProspek = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -19,7 +20,7 @@ export const DaftarProspek = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: getTodayString(),
     nama: '',
     alamat_tempat: '',
     no_hp: '',
@@ -58,7 +59,7 @@ export const DaftarProspek = () => {
   const handleOpenCreate = () => {
     setEditingItem(null);
     setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: tanggal || getTodayString(),
       nama: '',
       alamat_tempat: '',
       no_hp: '',
@@ -71,7 +72,7 @@ export const DaftarProspek = () => {
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setFormData({
-      tanggal: item.tanggal ? item.tanggal.split('T')[0] : new Date().toISOString().split('T')[0],
+      tanggal: item.tanggal ? formatDateDisplay(item.tanggal) : getTodayString(),
       nama: item.nama || '',
       alamat_tempat: item.alamat_tempat || '',
       no_hp: item.no_hp || '',

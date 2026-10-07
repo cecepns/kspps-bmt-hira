@@ -18,6 +18,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const Dashboard = ({ user }) => {
   const [stats, setStats] = useState({
@@ -44,7 +45,7 @@ export const Dashboard = ({ user }) => {
   const [userOptions, setUserOptions] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: getTodayString(),
     user_id: user?.id || '',
     jumlah_transaksi: '',
     jumlah_nominal: '',
@@ -70,7 +71,7 @@ export const Dashboard = ({ user }) => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayString();
       const [nasabahRes, txRes, prospekRes, collectorRes] = await Promise.all([
         request.get(API_ENDPOINTS.NASABAH.LIST, { limit: 1 }),
         request.get(API_ENDPOINTS.TRANSAKSI.LIST, { tanggal: today, limit: 100 }),
@@ -104,7 +105,7 @@ export const Dashboard = ({ user }) => {
 
   const handleOpenModalCollector = () => {
     setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: getTodayString(),
       user_id: user?.id || '',
       jumlah_transaksi: '',
       jumlah_nominal: '',

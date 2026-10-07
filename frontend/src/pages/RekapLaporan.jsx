@@ -4,10 +4,11 @@ import { API_ENDPOINTS } from '../utils/endpoints';
 import toast from 'react-hot-toast';
 import { Printer, Calendar, FileSpreadsheet, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const RekapLaporan = () => {
   const [activeTab, setActiveTab] = useState('harian');
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [bulan, setBulan] = useState(new Date().getMonth() + 1);
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -111,7 +112,7 @@ export const RekapLaporan = () => {
       const collectorData = (rekapHarianData?.collector || []).map((item, idx) => ({
         NO: idx + 1,
         MARKETING: item.pegawai_nama || '-',
-        TANGGAL: item.tanggal ? item.tanggal.split('T')[0] : '-',
+        TANGGAL: formatDateDisplay(item.tanggal),
         JUMLAH_TRANSAKSI: item.jumlah_transaksi,
         JUMLAH_NOMINAL: item.jumlah_nominal,
         KETERANGAN: item.keterangan || '-'

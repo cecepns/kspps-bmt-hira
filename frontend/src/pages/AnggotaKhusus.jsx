@@ -5,6 +5,7 @@ import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, UserX, UserMinus } from 'lucide-react';
+import { getTodayString } from '../utils/date';
 
 export const AnggotaKhusus = ({ type }) => {
   const isTidakTransaksi = type === 'tidak-transaksi';
@@ -16,14 +17,14 @@ export const AnggotaKhusus = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: getTodayString(),
     no_rek: '',
     nama: '',
     alamat: '',
@@ -81,7 +82,7 @@ export const AnggotaKhusus = ({ type }) => {
 
   const handleOpenCreate = () => {
     setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: tanggal || getTodayString(),
       no_rek: '',
       nama: '',
       alamat: '',

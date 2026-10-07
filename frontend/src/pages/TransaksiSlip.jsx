@@ -6,6 +6,7 @@ import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Receipt, ArrowDownRight, ArrowUpRight, Banknote, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const TransaksiSlip = () => {
   const [data, setData] = useState([]);
@@ -13,7 +14,7 @@ export const TransaksiSlip = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -21,7 +22,7 @@ export const TransaksiSlip = () => {
   // Modal Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: getTodayString(),
     nasabah_id: '',
     tipe: 'setoran',
     nominal: '',
@@ -68,7 +69,7 @@ export const TransaksiSlip = () => {
 
   const handleOpenCreate = () => {
     setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: tanggal || getTodayString(),
       nasabah_id: nasabahList.length > 0 ? nasabahList[0].id : '',
       tipe: 'setoran',
       nominal: '',

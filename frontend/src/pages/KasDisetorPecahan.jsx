@@ -3,9 +3,10 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import toast from 'react-hot-toast';
 import { Coins, Save, CheckCircle2 } from 'lucide-react';
+import { getTodayString } from '../utils/date';
 
 export const KasDisetorPecahan = ({ user }) => {
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [selectedUserId, setSelectedUserId] = useState('');
   const [userOptions, setUserOptions] = useState([]);
   const [loading, setLoading] = useState(false);

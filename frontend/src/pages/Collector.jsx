@@ -6,13 +6,14 @@ import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Edit2, Banknote, Calendar, User, TrendingUp, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const Collector = ({ user }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [selectedUserId, setSelectedUserId] = useState('');
   const [userOptions, setUserOptions] = useState([]);
   const [page, setPage] = useState(1);
@@ -30,7 +31,7 @@ export const Collector = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: getTodayString(),
     user_id: user?.id || '',
     jumlah_transaksi: '',
     jumlah_nominal: '',
@@ -105,7 +106,7 @@ export const Collector = ({ user }) => {
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormData({
-      tanggal: tanggal || new Date().toISOString().split('T')[0],
+      tanggal: tanggal || getTodayString(),
       user_id: user?.id || '',
       jumlah_transaksi: '',
       jumlah_nominal: '',
@@ -117,7 +118,7 @@ export const Collector = ({ user }) => {
   const handleOpenEdit = (item) => {
     setEditingId(item.id);
     setFormData({
-      tanggal: item.tanggal ? item.tanggal.split('T')[0] : new Date().toISOString().split('T')[0],
+      tanggal: item.tanggal ? formatDateDisplay(item.tanggal) : getTodayString(),
       user_id: item.user_id || user?.id || '',
       jumlah_transaksi: item.jumlah_transaksi,
       jumlah_nominal: item.jumlah_nominal,
@@ -342,7 +343,7 @@ export const Collector = ({ user }) => {
                       {(page - 1) * limit + idx + 1}
                     </td>
                     <td className="py-3 px-4 font-mono font-medium text-slate-700">
-                      {item.tanggal ? item.tanggal.split('T')[0] : '-'}
+                      {formatDateDisplay(item.tanggal)}
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800">
                       <div className="flex items-center gap-1.5">

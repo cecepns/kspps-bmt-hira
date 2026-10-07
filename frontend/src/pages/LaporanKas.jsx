@@ -3,9 +3,10 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import toast from 'react-hot-toast';
 import { Wallet, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { getTodayString } from '../utils/date';
 
 export const LaporanKas = () => {
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggal, setTanggal] = useState(getTodayString());
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
