@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `nama` VARCHAR(100) NOT NULL,
   `username` VARCHAR(50) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('admin', 'pegawai') NOT NULL DEFAULT 'pegawai',
+  `role` ENUM('admin', 'manager', 'pegawai') NOT NULL DEFAULT 'pegawai',
   `jabatan` VARCHAR(50) DEFAULT 'Marketing',
   `no_hp` VARCHAR(20) DEFAULT NULL,
   `status` ENUM('aktif', 'nonaktif') DEFAULT 'aktif',

@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: "/users",
     CREATE: "/users",
+    IMPORT_BATCH: "/users/import-batch",
     UPDATE: (id) => `/users/${id}`,
     DELETE: (id) => `/users/${id}`,
   },

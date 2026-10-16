@@ -72,7 +72,7 @@ export default function App() {
               <Route path="/laporan-kas" element={<LaporanKas />} />
               <Route path="/pecahan" element={<KasDisetorPecahan user={user} />} />
               <Route path="/rekap" element={<RekapLaporan />} />
-              {user.role === 'admin' && (
+              {(user.role === 'admin' || user.role === 'manager') && (
                 <Route path="/pegawai" element={<ManajemenPegawai />} />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />

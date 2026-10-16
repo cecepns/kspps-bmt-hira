@@ -19,7 +19,9 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'bmt_hira',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  dateStrings: true,
+  timezone: '+07:00'
 });
 
 // Test connection on startup and ensure tables exist
@@ -171,10 +173,13 @@ app.post('/api/users', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Nama, username, dan password wajib diisi' });
   }
 
+  const validRoles = ['admin', 'manager', 'pegawai'];
+  const userRole = validRoles.includes(role) ? role : 'pegawai';
+
   try {
     const [result] = await pool.query(
       'INSERT INTO users (nama, username, password, role, jabatan, no_hp) VALUES (?, ?, ?, ?, ?, ?)',
-      [nama, username, password, role || 'pegawai', jabatan || 'Marketing', no_hp || '']
+      [nama, username, password, userRole, jabatan || (userRole === 'admin' ? 'Admin' : userRole === 'manager' ? 'Manager Cabang' : 'Marketing'), no_hp || '']
     );
     return res.json({ success: true, message: 'Pegawai berhasil ditambahkan', id: result.insertId });
   } catch (err) {
@@ -183,13 +188,86 @@ app.post('/api/users', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/users/import-batch', authMiddleware, async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : (req.body.usersList || req.body.data || []);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'Data pegawai untuk diimport tidak boleh kosong' });
+  }
+
+  // Filter valid rows (nama & username required)
+  const validItems = items.filter(item => item && item.nama && item.username);
+  if (validItems.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Tidak ada data valid yang dapat diimport. Pastikan kolom Nama dan Username terisi.'
+    });
+  }
+
+  try {
+    const validRoles = ['admin', 'manager', 'pegawai'];
+    const values = validItems.map(item => {
+      const nama = String(item.nama).trim();
+      const username = String(item.username).trim().toLowerCase();
+      const password = item.password ? String(item.password).trim() : '123456';
+
+      let rawRole = item.role ? String(item.role).trim().toLowerCase() : 'pegawai';
+      if (rawRole.includes('admin')) rawRole = 'admin';
+      else if (rawRole.includes('manag')) rawRole = 'manager';
+      else rawRole = 'pegawai';
+      const role = validRoles.includes(rawRole) ? rawRole : 'pegawai';
+
+      let defaultJabatan = 'Marketing';
+      if (role === 'admin') defaultJabatan = 'Admin';
+      else if (role === 'manager') defaultJabatan = 'Manager Cabang';
+      const jabatan = item.jabatan ? String(item.jabatan).trim() : defaultJabatan;
+
+      const no_hp = item.no_hp ? String(item.no_hp).trim() : '';
+      const rawStatus = item.status ? String(item.status).trim().toLowerCase() : 'aktif';
+      const status = (rawStatus === 'nonaktif' || rawStatus === 'non aktif' || rawStatus === 'tidak aktif') ? 'nonaktif' : 'aktif';
+
+      return [nama, username, password, role, jabatan, no_hp, status];
+    });
+
+    const sql = `
+      INSERT INTO users (nama, username, password, role, jabatan, no_hp, status)
+      VALUES ?
+      ON DUPLICATE KEY UPDATE
+        nama = VALUES(nama),
+        password = VALUES(password),
+        role = VALUES(role),
+        jabatan = VALUES(jabatan),
+        no_hp = VALUES(no_hp),
+        status = VALUES(status)
+    `;
+
+    const [result] = await pool.query(sql, [values]);
+
+    return res.json({
+      success: true,
+      message: `Berhasil mengimport ${validItems.length} data pegawai.`,
+      summary: {
+        totalReceived: items.length,
+        totalImported: validItems.length,
+        skipped: items.length - validItems.length,
+        affectedRows: result.affectedRows
+      }
+    });
+  } catch (err) {
+    console.error('Users Batch Import Error:', err);
+    return res.status(500).json({ success: false, message: 'Gagal mengimport data pegawai: ' + err.message });
+  }
+});
+
 app.put('/api/users/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { nama, username, password, role, jabatan, no_hp, status } = req.body;
 
+  const validRoles = ['admin', 'manager', 'pegawai'];
+  const userRole = validRoles.includes(role) ? role : 'pegawai';
+
   try {
     let query = 'UPDATE users SET nama = ?, username = ?, role = ?, jabatan = ?, no_hp = ?, status = ?';
-    let params = [nama, username, role, jabatan, no_hp, status];
+    let params = [nama, username, userRole, jabatan, no_hp, status];
     if (password) {
       query += ', password = ?';
       params.push(password);

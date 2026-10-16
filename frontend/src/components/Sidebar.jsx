@@ -39,7 +39,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
     { label: 'Rekapan & Laporan', path: '/rekap', icon: FileSpreadsheet },
   ];
 
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' || user?.role === 'manager') {
     navItems.push({ label: 'Manajemen Pegawai', path: '/pegawai', icon: Users });
   }
 
@@ -81,7 +81,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
           <div className="overflow-hidden">
             <p className="text-xs font-semibold text-white truncate">{user?.nama || 'Pengguna'}</p>
             <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-medium capitalize border border-sky-500/30">
-              {user?.role === 'admin' ? 'Admin' : 'Marketing'}
+              {user?.role === 'admin' ? 'Admin' : user?.role === 'manager' ? 'Manager' : 'Marketing'}
             </span>
           </div>
         </div>

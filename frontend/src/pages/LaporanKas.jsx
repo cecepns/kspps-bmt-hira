@@ -174,7 +174,7 @@ export const LaporanKas = () => {
                 <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 space-y-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                     <label className="block text-xs font-bold text-slate-800">
-                      2. KOLEKTOR (Rp)
+                      2. COLLECTOR (Rp)
                     </label>
                     <button
                       type="button"
