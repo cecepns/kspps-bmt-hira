@@ -128,7 +128,7 @@ export const Login = ({ onLoginSuccess }) => {
           <div className="mt-6 pt-4 border-t border-slate-100 text-center">
             <p className="text-[11px] font-medium text-slate-400 flex items-center justify-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-sky-500" />
-              ssued by IT KSPPS BMT HIRA 2026
+              Isued by IT KSPPS BMT HIRA 2026
             </p>
           </div>
         </div>
