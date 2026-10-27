@@ -37,6 +37,7 @@ const pool = mysql.createPool({
         \`nama\` VARCHAR(100) NOT NULL,
         \`alamat\` TEXT NOT NULL,
         \`no_hp\` VARCHAR(25) DEFAULT NULL,
+        \`titik_koordinat\` VARCHAR(255) DEFAULT NULL,
         \`jenis_layanan\` ENUM('Survey Pembiayaan', 'Penagihan Pembiayaan') NOT NULL DEFAULT 'Survey Pembiayaan',
         \`jumlah_plafond\` DECIMAL(15,2) DEFAULT 0.00,
         \`hasil_survey\` TEXT DEFAULT NULL,
@@ -46,6 +47,16 @@ const pool = mysql.createPool({
         FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    try {
+      await conn.query("ALTER TABLE `daftar_prospek` ADD COLUMN `titik_koordinat` VARCHAR(255) DEFAULT NULL AFTER `no_hp`");
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      await conn.query("ALTER TABLE `survey_pembiayaan` ADD COLUMN `titik_koordinat` VARCHAR(255) DEFAULT NULL AFTER `no_hp`");
+    } catch (e) {
+      // Column might already exist
+    }
     await conn.query(`
       CREATE TABLE IF NOT EXISTS \`transaksi_collector\` (
         \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -500,8 +511,8 @@ app.get('/api/prospek', authMiddleware, async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    let query = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE (p.nama LIKE ? OR p.alamat_tempat LIKE ? OR p.no_hp LIKE ?)';
-    let params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    let query = 'SELECT p.*, u.nama as pegawai_nama FROM daftar_prospek p JOIN users u ON p.user_id = u.id WHERE (p.nama LIKE ? OR p.alamat_tempat LIKE ? OR p.no_hp LIKE ? OR p.titik_koordinat LIKE ?)';
+    let params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     if (tanggal) {
       query += ' AND p.tanggal = ?';
       params.push(tanggal);
@@ -520,7 +531,7 @@ app.get('/api/prospek', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/prospek', authMiddleware, async (req, res) => {
-  const { tanggal, nama, alamat_tempat, no_hp, hasil, keterangan } = req.body;
+  const { tanggal, nama, alamat_tempat, no_hp, titik_koordinat, hasil, keterangan } = req.body;
   if (!nama || !alamat_tempat) {
     return res.status(400).json({ success: false, message: 'Nama & Alamat Tempat wajib diisi' });
   }
@@ -528,8 +539,8 @@ app.post('/api/prospek', authMiddleware, async (req, res) => {
 
   try {
     const [resDb] = await pool.query(
-      'INSERT INTO daftar_prospek (tanggal, user_id, nama, alamat_tempat, no_hp, hasil, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [dateStr, req.user.id, nama, alamat_tempat, no_hp || '', hasil || '', keterangan || '']
+      'INSERT INTO daftar_prospek (tanggal, user_id, nama, alamat_tempat, no_hp, titik_koordinat, hasil, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [dateStr, req.user.id, nama, alamat_tempat, no_hp || '', titik_koordinat || '', hasil || '', keterangan || '']
     );
     return res.json({ success: true, message: 'Data prospek berhasil ditambahkan', id: resDb.insertId });
   } catch (err) {
@@ -540,12 +551,12 @@ app.post('/api/prospek', authMiddleware, async (req, res) => {
 
 app.put('/api/prospek/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { tanggal, nama, alamat_tempat, no_hp, hasil, keterangan } = req.body;
+  const { tanggal, nama, alamat_tempat, no_hp, titik_koordinat, hasil, keterangan } = req.body;
 
   try {
     await pool.query(
-      'UPDATE daftar_prospek SET tanggal = ?, nama = ?, alamat_tempat = ?, no_hp = ?, hasil = ?, keterangan = ? WHERE id = ?',
-      [tanggal, nama, alamat_tempat, no_hp || '', hasil || '', keterangan || '', id]
+      'UPDATE daftar_prospek SET tanggal = ?, nama = ?, alamat_tempat = ?, no_hp = ?, titik_koordinat = ?, hasil = ?, keterangan = ? WHERE id = ?',
+      [tanggal, nama, alamat_tempat, no_hp || '', titik_koordinat || '', hasil || '', keterangan || '', id]
     );
     return res.json({ success: true, message: 'Data prospek berhasil diperbarui' });
   } catch (err) {
@@ -638,8 +649,8 @@ app.get('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    let query = 'SELECT s.*, u.nama as pegawai_nama FROM survey_pembiayaan s JOIN users u ON s.user_id = u.id WHERE (s.nama LIKE ? OR s.alamat LIKE ? OR s.no_hp LIKE ?)';
-    let params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    let query = 'SELECT s.*, u.nama as pegawai_nama FROM survey_pembiayaan s JOIN users u ON s.user_id = u.id WHERE (s.nama LIKE ? OR s.alamat LIKE ? OR s.no_hp LIKE ? OR s.titik_koordinat LIKE ?)';
+    let params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     if (tanggal) {
       query += ' AND s.tanggal = ?';
       params.push(tanggal);
@@ -662,7 +673,7 @@ app.get('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
-  const { tanggal, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
+  const { tanggal, nama, alamat, no_hp, titik_koordinat, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
   if (!nama || !alamat) {
     return res.status(400).json({ success: false, message: 'Nama dan Alamat wajib diisi' });
   }
@@ -670,8 +681,8 @@ app.post('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
 
   try {
     const [resDb] = await pool.query(
-      'INSERT INTO survey_pembiayaan (tanggal, user_id, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [dateStr, req.user.id, nama, alamat, no_hp || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '']
+      'INSERT INTO survey_pembiayaan (tanggal, user_id, nama, alamat, no_hp, titik_koordinat, jenis_layanan, jumlah_plafond, hasil_survey, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [dateStr, req.user.id, nama, alamat, no_hp || '', titik_koordinat || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '']
     );
     return res.json({ success: true, message: 'Data survey/penagihan pembiayaan berhasil disimpan', id: resDb.insertId });
   } catch (err) {
@@ -682,12 +693,12 @@ app.post('/api/survey-pembiayaan', authMiddleware, async (req, res) => {
 
 app.put('/api/survey-pembiayaan/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { tanggal, nama, alamat, no_hp, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
+  const { tanggal, nama, alamat, no_hp, titik_koordinat, jenis_layanan, jumlah_plafond, hasil_survey, keterangan } = req.body;
 
   try {
     await pool.query(
-      'UPDATE survey_pembiayaan SET tanggal = ?, nama = ?, alamat = ?, no_hp = ?, jenis_layanan = ?, jumlah_plafond = ?, hasil_survey = ?, keterangan = ? WHERE id = ?',
-      [tanggal, nama, alamat, no_hp || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '', id]
+      'UPDATE survey_pembiayaan SET tanggal = ?, nama = ?, alamat = ?, no_hp = ?, titik_koordinat = ?, jenis_layanan = ?, jumlah_plafond = ?, hasil_survey = ?, keterangan = ? WHERE id = ?',
+      [tanggal, nama, alamat, no_hp || '', titik_koordinat || '', jenis_layanan || 'Survey Pembiayaan', parseFloat(jumlah_plafond) || 0, hasil_survey || '', keterangan || '', id]
     );
     return res.json({ success: true, message: 'Data survey/penagihan pembiayaan berhasil diperbarui' });
   } catch (err) {

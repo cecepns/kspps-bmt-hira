@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import toast from 'react-hot-toast';
-import { Plus, Search, Trash2, Edit, Users, Phone, MessageSquare } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, Users, Phone, MessageSquare, MapPin, Navigation, ExternalLink, Loader2 } from 'lucide-react';
 import { getTodayString, formatDateDisplay } from '../utils/date';
 
 export const DaftarProspek = () => {
@@ -19,11 +19,13 @@ export const DaftarProspek = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [formData, setFormData] = useState({
     tanggal: getTodayString(),
     nama: '',
     alamat_tempat: '',
     no_hp: '',
+    titik_koordinat: '',
     hasil: '',
     keterangan: ''
   });
@@ -63,6 +65,7 @@ export const DaftarProspek = () => {
       nama: '',
       alamat_tempat: '',
       no_hp: '',
+      titik_koordinat: '',
       hasil: 'Tertarik',
       keterangan: ''
     });
@@ -76,10 +79,39 @@ export const DaftarProspek = () => {
       nama: item.nama || '',
       alamat_tempat: item.alamat_tempat || '',
       no_hp: item.no_hp || '',
+      titik_koordinat: item.titik_koordinat || '',
       hasil: item.hasil || '',
       keterangan: item.keterangan || ''
     });
     setIsModalOpen(true);
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Browser tidak mendukung fitur GPS/Geolokasi');
+      return;
+    }
+    setGettingLocation(true);
+    const toastId = toast.loading('Mengambil koordinat GPS...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const coordStr = `${lat}, ${lng}`;
+        setFormData(prev => ({ ...prev, titik_koordinat: coordStr }));
+        toast.success(`Lokasi GPS berhasil didapatkan! (${coordStr})`, { id: toastId });
+        setGettingLocation(false);
+      },
+      (error) => {
+        let msg = 'Gagal mengambil lokasi GPS';
+        if (error.code === 1) msg = 'Izin akses lokasi ditolak browser. Silakan aktifkan izin lokasi.';
+        else if (error.code === 2) msg = 'Posisi lokasi GPS tidak terdeteksi.';
+        else if (error.code === 3) msg = 'Waktu permintaan lokasi GPS habis (timeout).';
+        toast.error(msg, { id: toastId });
+        setGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const formatWaUrl = (phone) => {
@@ -200,6 +232,7 @@ export const DaftarProspek = () => {
                   <th className="py-3 px-4 w-12 text-center">NO</th>
                   <th className="py-3 px-4">NAMA PROSPEK</th>
                   <th className="py-3 px-4">ALAMAT / TEMPAT</th>
+                  <th className="py-3 px-4">LOKASI GPS</th>
                   <th className="py-3 px-4">NO. HANDPHONE / WA</th>
                   <th className="py-3 px-4">HASIL</th>
                   <th className="py-3 px-4">KETERANGAN</th>
@@ -212,6 +245,23 @@ export const DaftarProspek = () => {
                     <td className="py-3 px-4 text-center text-slate-500 font-medium">{(page - 1) * limit + idx + 1}</td>
                     <td className="py-3 px-4 font-bold text-slate-800">{item.nama}</td>
                     <td className="py-3 px-4 text-slate-600">{item.alamat_tempat}</td>
+                    <td className="py-3 px-4">
+                      {item.titik_koordinat ? (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.titik_koordinat)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-mono text-[11px] transition border border-sky-200 group"
+                          title="Buka lokasi di Google Maps"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0 group-hover:scale-110 transition" />
+                          <span className="truncate max-w-[120px]">{item.titik_koordinat}</span>
+                          <ExternalLink className="w-3 h-3 text-sky-400 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">- Belum ada -</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 font-mono text-slate-700">
                       {item.no_hp ? (
                         <a
@@ -303,6 +353,53 @@ export const DaftarProspek = () => {
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-700">Titik Koordinat (GPS Lokasi)</label>
+              <button
+                type="button"
+                onClick={handleGetLocation}
+                disabled={gettingLocation}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200 transition disabled:opacity-50"
+              >
+                {gettingLocation ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Mencari GPS...</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-3 h-3" />
+                    <span>Ambil Lokasi Saat Ini (GPS)</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="relative">
+              <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={formData.titik_koordinat}
+                onChange={(e) => setFormData({ ...formData, titik_koordinat: e.target.value })}
+                placeholder="Contoh: -6.917464, 107.619123"
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none font-mono"
+              />
+            </div>
+            <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+              <span>Bisa diisi manual atau klik tombol GPS di atas.</span>
+              {formData.titik_koordinat && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.titik_koordinat)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sky-600 hover:underline font-medium"
+                >
+                  <span>Buka di Maps</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">No. Handphone / WhatsApp (WA)</label>
