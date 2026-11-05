@@ -27,6 +27,11 @@ export const LaporanKas = () => {
     count: 0
   });
 
+  const [penarikanSummary, setPenarikanSummary] = useState({
+    total_nominal: 0,
+    count: 0
+  });
+
   useEffect(() => {
     fetchLaporanKas();
   }, [tanggal]);
@@ -34,9 +39,10 @@ export const LaporanKas = () => {
   const fetchLaporanKas = async () => {
     setLoading(true);
     try {
-      const [kasRes, collectorRes] = await Promise.all([
+      const [kasRes, collectorRes, penarikanRes] = await Promise.all([
         request.get(API_ENDPOINTS.LAPORAN_KAS.GET, { tanggal }),
-        request.get(API_ENDPOINTS.COLLECTOR.SUMMARY_TODAY, { tanggal })
+        request.get(API_ENDPOINTS.COLLECTOR.SUMMARY_TODAY, { tanggal }),
+        request.get(API_ENDPOINTS.TRANSAKSI.SUMMARY_PENARIKAN, { tanggal })
       ]);
 
       const collTotal = collectorRes?.success && collectorRes?.data
@@ -49,30 +55,43 @@ export const LaporanKas = () => {
         setCollectorSummary({ total_nominal: 0, total_transaksi: 0, count: 0 });
       }
 
+      const penTotal = penarikanRes?.success && penarikanRes?.data
+        ? Number(penarikanRes.data.total_nominal || 0)
+        : 0;
+
+      if (penarikanRes?.success && penarikanRes?.data) {
+        setPenarikanSummary(penarikanRes.data);
+      } else {
+        setPenarikanSummary({ total_nominal: 0, count: 0 });
+      }
+
       if (kasRes.success && kasRes.data) {
-        // Jika data laporan kas sudah pernah disimpan dengan nilai kolektor > 0, gunakan nilai tersebut.
-        // Jika nilai kolektor di laporan kas masih 0 tapi ada data collector pada tanggal tersebut, otomatis auto-fill!
+        // Jika data laporan kas sudah pernah disimpan dengan nilai kolektor / penarikan > 0, gunakan nilai tersebut.
+        // Jika masih 0 tapi ada data collector / slip penarikan pada tanggal tersebut, otomatis auto-fill!
         const savedKolektor = Number(kasRes.data.kolektor || 0);
         const finalKolektor = savedKolektor > 0 ? savedKolektor : collTotal;
+
+        const savedPenarikan = Number(kasRes.data.pengeluaran_sibela || 0);
+        const finalPenarikan = savedPenarikan > 0 ? savedPenarikan : penTotal;
 
         setFormData({
           kas_kantor: kasRes.data.kas_kantor || 0,
           kolektor: finalKolektor,
           penerimaan_sibela: kasRes.data.penerimaan_sibela || 0,
           penerimaan_lain: kasRes.data.penerimaan_lain || 0,
-          pengeluaran_sibela: kasRes.data.pengeluaran_sibela || 0,
+          pengeluaran_sibela: finalPenarikan,
           pengeluaran_pinjaman: kasRes.data.pengeluaran_pinjaman || 0,
           pengeluaran_operasional: kasRes.data.pengeluaran_operasional || 0,
           pengeluaran_lain: kasRes.data.pengeluaran_lain || 0
         });
       } else {
-        // Jika belum ada laporan kas tersimpan untuk tanggal ini, nilai kolektor otomatis auto-fill dari data collector!
+        // Jika belum ada laporan kas tersimpan untuk tanggal ini, nilai kolektor & penarikan otomatis auto-fill!
         setFormData({
           kas_kantor: 0,
           kolektor: collTotal,
           penerimaan_sibela: 0,
           penerimaan_lain: 0,
-          pengeluaran_sibela: 0,
+          pengeluaran_sibela: penTotal,
           pengeluaran_pinjaman: 0,
           pengeluaran_operasional: 0,
           pengeluaran_lain: 0
@@ -91,6 +110,14 @@ export const LaporanKas = () => {
       kolektor: collectorSummary.total_nominal || 0
     }));
     toast.success(`Nilai Kolektor di-fill otomatis: ${formatRupiah(collectorSummary.total_nominal || 0)}`);
+  };
+
+  const handleSyncPenarikan = () => {
+    setFormData(prev => ({
+      ...prev,
+      pengeluaran_sibela: penarikanSummary.total_nominal || 0
+    }));
+    toast.success(`Nilai Sirela Penarikan di-fill otomatis: ${formatRupiah(penarikanSummary.total_nominal || 0)}`);
   };
 
   const handleChange = (field, val) => {
@@ -242,15 +269,39 @@ export const LaporanKas = () => {
                 <span>KAS KELUAR</span>
               </div>
               <div className="p-5 space-y-4 flex-1">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">1. SIRELA / PENARIKAN (Rp)</label>
+                <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-200/80 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <label className="block text-xs font-bold text-slate-800">
+                      1. SIRELA / PENARIKAN (Rp)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSyncPenarikan}
+                      className="text-[11px] font-bold text-rose-800 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-2 py-0.5 rounded-lg transition inline-flex items-center gap-1 w-fit"
+                      title="Klik untuk auto-fill nilai sesuai total slip penarikan sirela pada tanggal ini"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Auto-Fill Total Penarikan Sirela</span>
+                    </button>
+                  </div>
                   <input
                     type="number"
                     value={formData.pengeluaran_sibela || ''}
                     onChange={(e) => handleChange('pengeluaran_sibela', e.target.value)}
                     placeholder="0"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none bg-white"
                   />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5">
+                    <span>
+                      Total Slip Penarikan: <strong className="text-rose-800">{formatRupiah(penarikanSummary.total_nominal)}</strong> ({penarikanSummary.count} Transaksi)
+                    </span>
+                    {Number(formData.pengeluaran_sibela) === Number(penarikanSummary.total_nominal) && penarikanSummary.total_nominal > 0 && (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Sesuai Total Slip Penarikan</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div>

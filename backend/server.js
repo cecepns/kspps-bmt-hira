@@ -72,6 +72,44 @@ const pool = mysql.createPool({
         FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`target_canvasing\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT NOT NULL,
+        \`nama_marketing\` VARCHAR(100) NOT NULL,
+        \`cabang\` VARCHAR(100) NOT NULL,
+        \`periode_bulan\` DATE NOT NULL,
+        \`target_nasabah\` INT DEFAULT 0,
+        \`target_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`realisasi_nasabah\` INT DEFAULT 0,
+        \`realisasi_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`keterangan\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_user_id\` (\`user_id\`),
+        INDEX \`idx_periode\` (\`periode_bulan\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`target_canvasing\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT NOT NULL,
+        \`nama_marketing\` VARCHAR(100) NOT NULL,
+        \`cabang\` VARCHAR(100) NOT NULL,
+        \`periode_bulan\` DATE NOT NULL,
+        \`target_nasabah\` INT DEFAULT 0,
+        \`target_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`realisasi_nasabah\` INT DEFAULT 0,
+        \`realisasi_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`keterangan\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_user_id\` (\`user_id\`),
+        INDEX \`idx_periode\` (\`periode_bulan\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
     conn.release();
     console.log('✅ Connected to MySQL Database: ' + (process.env.DB_NAME || 'bmt_hira'));
   } catch (err) {
@@ -976,6 +1014,216 @@ app.post('/api/pecahan', authMiddleware, async (req, res) => {
   }
 });
 
+// --- TARGET CANVASING ---
+app.get('/api/target-canvasing', authMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || '';
+  const bulan = req.query.bulan ? parseInt(req.query.bulan) : null;
+  const tahun = req.query.tahun ? parseInt(req.query.tahun) : null;
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+  const offset = (page - 1) * limit;
+
+  try {
+    let where = '1=1';
+    let params = [];
+
+    if (search) {
+      where += ' AND (tc.nama_marketing LIKE ? OR tc.cabang LIKE ? OR tc.keterangan LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s);
+    }
+    if (bulan) { where += ' AND MONTH(tc.periode_bulan) = ?'; params.push(bulan); }
+    if (tahun) { where += ' AND YEAR(tc.periode_bulan) = ?'; params.push(tahun); }
+    if (userId) { where += ' AND tc.user_id = ?'; params.push(userId); }
+
+    const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM target_canvasing tc WHERE ${where}`, params);
+    const total = countRes[0].total;
+
+    const [rows] = await pool.query(
+      `SELECT tc.*, u.nama as nama_user FROM target_canvasing tc LEFT JOIN users u ON tc.user_id = u.id WHERE ${where} ORDER BY tc.periode_bulan DESC, tc.id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    console.error('Target Canvasing List Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/target-canvasing', authMiddleware, async (req, res) => {
+  const { nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan } = req.body;
+  if (!nama_marketing || !cabang || !periode_bulan) {
+    return res.status(400).json({ success: false, message: 'nama_marketing, cabang, periode_bulan wajib diisi' });
+  }
+  try {
+    // ensure table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`target_canvasing\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT NOT NULL,
+        \`nama_marketing\` VARCHAR(100) NOT NULL,
+        \`cabang\` VARCHAR(100) NOT NULL,
+        \`periode_bulan\` DATE NOT NULL,
+        \`target_nasabah\` INT DEFAULT 0,
+        \`target_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`realisasi_nasabah\` INT DEFAULT 0,
+        \`realisasi_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`keterangan\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_user_id\` (\`user_id\`),
+        INDEX \`idx_periode\` (\`periode_bulan\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    const result = await pool.query(
+      'INSERT INTO target_canvasing (user_id, nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, nama_marketing, cabang, periode_bulan, target_nasabah || 0, target_nominal || 0, realisasi_nasabah || 0, realisasi_nominal || 0, keterangan || null]
+    );
+    return res.json({ success: true, message: 'Target canvasing berhasil disimpan', id: result[0].insertId });
+  } catch (err) {
+    console.error('Target Canvasing Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/target-canvasing/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan } = req.body;
+  try {
+    await pool.query(
+      'UPDATE target_canvasing SET nama_marketing=?, cabang=?, periode_bulan=?, target_nasabah=?, target_nominal=?, realisasi_nasabah=?, realisasi_nominal=?, keterangan=? WHERE id=?',
+      [nama_marketing, cabang, periode_bulan, target_nasabah || 0, target_nominal || 0, realisasi_nasabah || 0, realisasi_nominal || 0, keterangan || null, id]
+    );
+    return res.json({ success: true, message: 'Target canvasing berhasil diperbarui' });
+  } catch (err) {
+    console.error('Target Canvasing Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/target-canvasing/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM target_canvasing WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Target canvasing berhasil dihapus' });
+  } catch (err) {
+    console.error('Target Canvasing Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// --- TARGET CANVASING ---
+app.get('/api/target-canvasing', authMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || '';
+  const bulan = req.query.bulan ? parseInt(req.query.bulan) : null;
+  const tahun = req.query.tahun ? parseInt(req.query.tahun) : null;
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+  const offset = (page - 1) * limit;
+
+  try {
+    let where = '1=1';
+    let params = [];
+
+    if (search) {
+      where += ' AND (tc.nama_marketing LIKE ? OR tc.cabang LIKE ? OR tc.keterangan LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s);
+    }
+    if (bulan) { where += ' AND MONTH(tc.periode_bulan) = ?'; params.push(bulan); }
+    if (tahun) { where += ' AND YEAR(tc.periode_bulan) = ?'; params.push(tahun); }
+    if (userId) { where += ' AND tc.user_id = ?'; params.push(userId); }
+
+    const [countRes] = await pool.query(`SELECT COUNT(*) as total FROM target_canvasing tc WHERE ${where}`, params);
+    const total = countRes[0].total;
+
+    const [rows] = await pool.query(
+      `SELECT tc.*, u.nama as nama_user FROM target_canvasing tc LEFT JOIN users u ON tc.user_id = u.id WHERE ${where} ORDER BY tc.periode_bulan DESC, tc.id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    console.error('Target Canvasing List Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/target-canvasing', authMiddleware, async (req, res) => {
+  const { nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan } = req.body;
+  if (!nama_marketing || !cabang || !periode_bulan) {
+    return res.status(400).json({ success: false, message: 'nama_marketing, cabang, periode_bulan wajib diisi' });
+  }
+  try {
+    // ensure table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`target_canvasing\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT NOT NULL,
+        \`nama_marketing\` VARCHAR(100) NOT NULL,
+        \`cabang\` VARCHAR(100) NOT NULL,
+        \`periode_bulan\` DATE NOT NULL,
+        \`target_nasabah\` INT DEFAULT 0,
+        \`target_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`realisasi_nasabah\` INT DEFAULT 0,
+        \`realisasi_nominal\` DECIMAL(15,2) DEFAULT 0.00,
+        \`keterangan\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_user_id\` (\`user_id\`),
+        INDEX \`idx_periode\` (\`periode_bulan\`),
+        FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    const result = await pool.query(
+      'INSERT INTO target_canvasing (user_id, nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, nama_marketing, cabang, periode_bulan, target_nasabah || 0, target_nominal || 0, realisasi_nasabah || 0, realisasi_nominal || 0, keterangan || null]
+    );
+    return res.json({ success: true, message: 'Target canvasing berhasil disimpan', id: result[0].insertId });
+  } catch (err) {
+    console.error('Target Canvasing Create Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/target-canvasing/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { nama_marketing, cabang, periode_bulan, target_nasabah, target_nominal, realisasi_nasabah, realisasi_nominal, keterangan } = req.body;
+  try {
+    await pool.query(
+      'UPDATE target_canvasing SET nama_marketing=?, cabang=?, periode_bulan=?, target_nasabah=?, target_nominal=?, realisasi_nasabah=?, realisasi_nominal=?, keterangan=? WHERE id=?',
+      [nama_marketing, cabang, periode_bulan, target_nasabah || 0, target_nominal || 0, realisasi_nasabah || 0, realisasi_nominal || 0, keterangan || null, id]
+    );
+    return res.json({ success: true, message: 'Target canvasing berhasil diperbarui' });
+  } catch (err) {
+    console.error('Target Canvasing Update Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/target-canvasing/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM target_canvasing WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Target canvasing berhasil dihapus' });
+  } catch (err) {
+    console.error('Target Canvasing Delete Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // --- REKAPITULASI HARIAN & BULANAN LENGKAP ---
 app.get('/api/rekap/harian', authMiddleware, async (req, res) => {
   const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
@@ -1123,6 +1371,188 @@ app.get('/api/rekap/bulanan', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Rekap Bulanan Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// --- REKAP MINGGUAN ---
+app.get('/api/rekap/mingguan', authMiddleware, async (req, res) => {
+  // tanggal_dari & tanggal_sampai wajib dikirim
+  const tanggalDari = req.query.tanggal_dari;
+  const tanggalSampai = req.query.tanggal_sampai;
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+
+  if (!tanggalDari || !tanggalSampai) {
+    return res.status(400).json({ success: false, message: 'tanggal_dari dan tanggal_sampai wajib diisi' });
+  }
+
+  try {
+    let slipWhere = 'tanggal BETWEEN ? AND ?';
+    let slipParams = [tanggalDari, tanggalSampai];
+    if (userId) { slipWhere += ' AND user_id = ?'; slipParams.push(userId); }
+
+    const [slipRows] = await pool.query(`SELECT tipe, nominal FROM transaksi_harian WHERE ${slipWhere}`, slipParams);
+    const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalTxCount = slipRows.length;
+
+    let cParams = [tanggalDari, tanggalSampai];
+    let cWhere = 'tanggal BETWEEN ? AND ?';
+    if (userId) { cWhere += ' AND user_id = ?'; cParams.push(userId); }
+    const [collectorRows] = await pool.query(
+      `SELECT COALESCE(SUM(jumlah_transaksi),0) as total_transaksi, COALESCE(SUM(jumlah_nominal),0) as total_nominal FROM transaksi_collector WHERE ${cWhere}`,
+      cParams
+    );
+    const collectorTotalNominal = Number(collectorRows[0]?.total_nominal || 0);
+    const collectorTotalTransaksi = Number(collectorRows[0]?.total_transaksi || 0);
+    // Pengendapan = collector - sirela penarikan
+    const pengendapan = collectorTotalNominal > 0 ? (collectorTotalNominal - totalPenarikan) : 0;
+
+    let pParams = [tanggalDari, tanggalSampai];
+    let pWhere = 'tanggal BETWEEN ? AND ?';
+    if (userId) { pWhere += ' AND user_id = ?'; pParams.push(userId); }
+    const [prospekRows] = await pool.query(`SELECT COUNT(*) as cnt FROM daftar_prospek WHERE ${pWhere}`, pParams);
+
+    const [ttRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_transaksi WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+    const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+    const [surveyRows] = await pool.query(`SELECT COUNT(*) as cnt FROM survey_pembiayaan WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+
+    const prospekCount = prospekRows[0]?.cnt || 0;
+    const ttCount = ttRows[0]?.cnt || 0;
+    const tkCount = tkRows[0]?.cnt || 0;
+    const surveyCount = surveyRows[0]?.cnt || 0;
+    const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount + surveyCount;
+
+    return res.json({
+      success: true,
+      data: {
+        tanggal_dari: tanggalDari,
+        tanggal_sampai: tanggalSampai,
+        total_setoran: totalSetoran,
+        total_penarikan: totalPenarikan,
+        total_transaksi_count: totalTxCount,
+        collector_total_nominal: collectorTotalNominal,
+        collector_total_transaksi: collectorTotalTransaksi,
+        pengendapan: pengendapan,
+        total_kunjungan_count: totalKunjungan,
+        total_prospek_count: prospekCount,
+        total_survey_count: surveyCount
+      }
+    });
+  } catch (err) {
+    console.error('Rekap Mingguan Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// --- SUMMARY SLIP PENARIKAN (untuk auto-fill LaporanKas pengeluaran sirela) ---
+app.get('/api/transaksi/summary-penarikan', authMiddleware, async (req, res) => {
+  const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+  try {
+    let where = 'tanggal = ? AND tipe = ?';
+    let params = [tanggal, 'penarikan'];
+    if (userId) { where += ' AND user_id = ?'; params.push(userId); }
+    const [rows] = await pool.query(`SELECT COALESCE(SUM(nominal),0) as total_nominal, COUNT(*) as count FROM transaksi_harian WHERE ${where}`, params);
+    return res.json({
+      success: true,
+      data: {
+        total_nominal: Number(rows[0]?.total_nominal || 0),
+        count: Number(rows[0]?.count || 0)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// --- REKAP MINGGUAN ---
+app.get('/api/rekap/mingguan', authMiddleware, async (req, res) => {
+  // tanggal_dari & tanggal_sampai wajib dikirim
+  const tanggalDari = req.query.tanggal_dari;
+  const tanggalSampai = req.query.tanggal_sampai;
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+
+  if (!tanggalDari || !tanggalSampai) {
+    return res.status(400).json({ success: false, message: 'tanggal_dari dan tanggal_sampai wajib diisi' });
+  }
+
+  try {
+    let slipWhere = 'tanggal BETWEEN ? AND ?';
+    let slipParams = [tanggalDari, tanggalSampai];
+    if (userId) { slipWhere += ' AND user_id = ?'; slipParams.push(userId); }
+
+    const [slipRows] = await pool.query(`SELECT tipe, nominal FROM transaksi_harian WHERE ${slipWhere}`, slipParams);
+    const totalSetoran = slipRows.filter(t => t.tipe === 'setoran').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalPenarikan = slipRows.filter(t => t.tipe === 'penarikan').reduce((acc, curr) => acc + Number(curr.nominal), 0);
+    const totalTxCount = slipRows.length;
+
+    let cParams = [tanggalDari, tanggalSampai];
+    let cWhere = 'tanggal BETWEEN ? AND ?';
+    if (userId) { cWhere += ' AND user_id = ?'; cParams.push(userId); }
+    const [collectorRows] = await pool.query(
+      `SELECT COALESCE(SUM(jumlah_transaksi),0) as total_transaksi, COALESCE(SUM(jumlah_nominal),0) as total_nominal FROM transaksi_collector WHERE ${cWhere}`,
+      cParams
+    );
+    const collectorTotalNominal = Number(collectorRows[0]?.total_nominal || 0);
+    const collectorTotalTransaksi = Number(collectorRows[0]?.total_transaksi || 0);
+    // Pengendapan = collector - sirela penarikan
+    const pengendapan = collectorTotalNominal > 0 ? (collectorTotalNominal - totalPenarikan) : 0;
+
+    let pParams = [tanggalDari, tanggalSampai];
+    let pWhere = 'tanggal BETWEEN ? AND ?';
+    if (userId) { pWhere += ' AND user_id = ?'; pParams.push(userId); }
+    const [prospekRows] = await pool.query(`SELECT COUNT(*) as cnt FROM daftar_prospek WHERE ${pWhere}`, pParams);
+
+    const [ttRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_transaksi WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+    const [tkRows] = await pool.query(`SELECT COUNT(*) as cnt FROM tidak_dikunjungi WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+    const [surveyRows] = await pool.query(`SELECT COUNT(*) as cnt FROM survey_pembiayaan WHERE tanggal BETWEEN ? AND ?${userId ? ' AND user_id = ?' : ''}`, userId ? [tanggalDari, tanggalSampai, userId] : [tanggalDari, tanggalSampai]);
+
+    const prospekCount = prospekRows[0]?.cnt || 0;
+    const ttCount = ttRows[0]?.cnt || 0;
+    const tkCount = tkRows[0]?.cnt || 0;
+    const surveyCount = surveyRows[0]?.cnt || 0;
+    const totalKunjungan = totalTxCount + prospekCount + ttCount + tkCount + surveyCount;
+
+    return res.json({
+      success: true,
+      data: {
+        tanggal_dari: tanggalDari,
+        tanggal_sampai: tanggalSampai,
+        total_setoran: totalSetoran,
+        total_penarikan: totalPenarikan,
+        total_transaksi_count: totalTxCount,
+        collector_total_nominal: collectorTotalNominal,
+        collector_total_transaksi: collectorTotalTransaksi,
+        pengendapan: pengendapan,
+        total_kunjungan_count: totalKunjungan,
+        total_prospek_count: prospekCount,
+        total_survey_count: surveyCount
+      }
+    });
+  } catch (err) {
+    console.error('Rekap Mingguan Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// --- SUMMARY SLIP PENARIKAN (untuk auto-fill LaporanKas pengeluaran sirela) ---
+app.get('/api/transaksi/summary-penarikan', authMiddleware, async (req, res) => {
+  const tanggal = req.query.tanggal || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
+  try {
+    let where = 'tanggal = ? AND tipe = ?';
+    let params = [tanggal, 'penarikan'];
+    if (userId) { where += ' AND user_id = ?'; params.push(userId); }
+    const [rows] = await pool.query(`SELECT COALESCE(SUM(nominal),0) as total_nominal, COUNT(*) as count FROM transaksi_harian WHERE ${where}`, params);
+    return res.json({
+      success: true,
+      data: {
+        total_nominal: Number(rows[0]?.total_nominal || 0),
+        count: Number(rows[0]?.count || 0)
+      }
+    });
+  } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });

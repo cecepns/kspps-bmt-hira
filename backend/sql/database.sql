@@ -198,3 +198,24 @@ INSERT INTO `rincian_pecahan` (`tanggal`, `user_id`, `p100k`, `p50k`, `p20k`, `p
 
 INSERT INTO `transaksi_collector` (`tanggal`, `user_id`, `jumlah_transaksi`, `jumlah_nominal`, `keterangan`) VALUES
 (CURDATE(), 2, 12, 1850000.00, 'Setoran & penagihan wilayah pasar');
+
+CREATE TABLE IF NOT EXISTS `target_canvasing` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `nama_marketing` VARCHAR(100) NOT NULL,
+  `cabang` VARCHAR(100) NOT NULL,
+  `periode_bulan` DATE NOT NULL,
+  `target_nasabah` INT DEFAULT 0,
+  `target_nominal` DECIMAL(15,2) DEFAULT 0.00,
+  `realisasi_nasabah` INT DEFAULT 0,
+  `realisasi_nominal` DECIMAL(15,2) DEFAULT 0.00,
+  `keterangan` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_user_id` (`user_id`),
+  INDEX `idx_periode` (`periode_bulan`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `target_canvasing` (`user_id`, `nama_marketing`, `cabang`, `periode_bulan`, `target_nasabah`, `target_nominal`, `realisasi_nasabah`, `realisasi_nominal`, `keterangan`) VALUES
+(1, 'Ahmad Fauzi', 'Cabang Utama Bandung', CURDATE(), 25, 50000000.00, 18, 38500000.00, 'Target canvasing wilayah pasar & sentra UKM');

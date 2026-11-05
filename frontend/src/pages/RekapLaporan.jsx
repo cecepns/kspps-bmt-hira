@@ -9,6 +9,13 @@ import { getTodayString, formatDateDisplay } from '../utils/date';
 export const RekapLaporan = () => {
   const [activeTab, setActiveTab] = useState('harian');
   const [tanggal, setTanggal] = useState(getTodayString());
+  // Default range 7 hari terakhir untuk rekap mingguan
+  const [tanggalDari, setTanggalDari] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().split('T')[0];
+  });
+  const [tanggalSampai, setTanggalSampai] = useState(getTodayString());
   const [bulan, setBulan] = useState(new Date().getMonth() + 1);
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -17,6 +24,7 @@ export const RekapLaporan = () => {
 
   // Rekap Data State
   const [rekapHarianData, setRekapHarianData] = useState(null);
+  const [rekapMingguanData, setRekapMingguanData] = useState(null);
   const [rekapBulananData, setRekapBulananData] = useState(null);
 
   useEffect(() => {
@@ -26,10 +34,12 @@ export const RekapLaporan = () => {
   useEffect(() => {
     if (activeTab === 'harian') {
       fetchRekapHarian();
+    } else if (activeTab === 'mingguan') {
+      fetchRekapMingguan();
     } else {
       fetchRekapBulanan();
     }
-  }, [activeTab, tanggal, bulan, tahun, selectedUserId]);
+  }, [activeTab, tanggal, tanggalDari, tanggalSampai, bulan, tahun, selectedUserId]);
 
   const fetchUsers = async () => {
     try {
@@ -58,6 +68,22 @@ export const RekapLaporan = () => {
     }
   };
 
+  const fetchRekapMingguan = async () => {
+    setLoading(true);
+    try {
+      const params = { tanggal_dari: tanggalDari, tanggal_sampai: tanggalSampai };
+      if (selectedUserId) params.user_id = selectedUserId;
+      const res = await request.get(API_ENDPOINTS.REKAP.MINGGUAN, params);
+      if (res.success) {
+        setRekapMingguanData(res.data);
+      }
+    } catch (err) {
+      toast.error('Gagal mengambil rekap mingguan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchRekapBulanan = async () => {
     setLoading(true);
     try {
@@ -78,10 +104,17 @@ export const RekapLaporan = () => {
     window.print();
   };
 
-  const totalTransaksiNominal = (rekapHarianData?.slip || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+  // Rumus Hasil Pengendapan: Hasil Collector - Sirela Penarikan
   const collectorNominal = Number(rekapHarianData?.collector_summary?.total_nominal || 0);
   const collectorTransaksi = Number(rekapHarianData?.collector_summary?.total_transaksi || 0);
-  const pengendapan = collectorNominal > 0 ? (collectorNominal - totalTransaksiNominal) : 0;
+
+  const sirelaPenarikanNominal = (rekapHarianData?.slip || [])
+    .filter(item => item.tipe === 'penarikan')
+    .reduce((sum, item) => sum + Number(item.nominal || 0), 0) || Number(rekapHarianData?.laporan_kas?.pengeluaran_sibela || 0);
+
+  const pengendapan = collectorNominal - sirelaPenarikanNominal;
+
+  const totalTransaksiNominal = (rekapHarianData?.slip || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
 
   const totalJumlahKunjungan = (rekapHarianData?.slip?.length || 0) +
     (rekapHarianData?.prospek?.length || 0) +
@@ -101,8 +134,9 @@ export const RekapLaporan = () => {
         { METRIK: 'TOTAL NOMINAL TRANSAKSI SLIP', NILAI: totalTransaksiNominal },
         { METRIK: 'JUMLAH TRANSAKSI COLLECTOR', NILAI: collectorTransaksi },
         { METRIK: 'TOTAL NOMINAL COLLECTOR', NILAI: collectorNominal },
-        { METRIK: 'PENGENDAPAN (DANA MENGENDAP)', NILAI: pengendapan },
-        { METRIK: 'JUMLAH SURVEY / PENAGIHAN', NILAI: rekapHarianData?.survey_pembiayaan?.length || 0 },
+        { METRIK: 'SIRELA PENARIKAN TUNAI', NILAI: sirelaPenarikanNominal },
+        { METRIK: 'HASIL PENGENDAPAN (COLLECTOR - SIRELA PENARIKAN)', NILAI: pengendapan },
+        { METRIK: 'JUMLAH TARGET CANVASING', NILAI: rekapHarianData?.survey_pembiayaan?.length || 0 },
         { METRIK: 'JUMLAH KUNJUNGAN (TOTAL)', NILAI: totalJumlahKunjungan }
       ];
       const wsSum = XLSX.utils.json_to_sheet(summaryData);
@@ -146,20 +180,20 @@ export const RekapLaporan = () => {
       const wsProspek = XLSX.utils.json_to_sheet(prospekData);
       XLSX.utils.book_append_sheet(workbook, wsProspek, 'Daftar Prospek');
 
-      // 3. Survey & Penagihan Pembiayaan Sheet
+      // 3. Target Canvasing Sheet (Sebelumnya Survey Pembiayaan)
       const surveyData = (rekapHarianData?.survey_pembiayaan || []).map((item, idx) => ({
         NO: idx + 1,
         NAMA: item.nama,
         ALAMAT: item.alamat,
         TITIK_KOORDINAT: item.titik_koordinat || '-',
         NO_HP_WA: item.no_hp || '-',
-        OPSI_LAYANAN: item.jenis_layanan || 'Survey Pembiayaan',
+        OPSI_LAYANAN: item.jenis_layanan || 'Target Canvasing',
         PLAFOND: item.jumlah_plafond || 0,
-        HASIL_SURVEY: item.hasil_survey || '-',
+        HASIL_CANVASING: item.hasil_survey || '-',
         KETERANGAN: item.keterangan || '-'
       }));
       const wsSurvey = XLSX.utils.json_to_sheet(surveyData);
-      XLSX.utils.book_append_sheet(workbook, wsSurvey, 'Survey Pembiayaan');
+      XLSX.utils.book_append_sheet(workbook, wsSurvey, 'Target Canvasing');
 
       // 4. Tidak Transaksi & Tidak Dikunjungi
       const tdkTxData = (rekapHarianData?.tidak_transaksi || []).map((item, idx) => ({
@@ -193,21 +227,44 @@ export const RekapLaporan = () => {
       XLSX.utils.book_append_sheet(workbook, wsKas, 'Laporan Kas');
 
       XLSX.writeFile(workbook, `Rekap_Harian_BMT_Hira_${tanggal}.xlsx`);
+    } else if (activeTab === 'mingguan') {
+      const mingguanCollectorNominal = Number(rekapMingguanData?.collector_total_nominal || 0);
+      const mingguanCollectorTx = Number(rekapMingguanData?.collector_total_transaksi || 0);
+      const mingguanPenarikan = Number(rekapMingguanData?.total_penarikan || 0);
+      const mingguanPengendapan = mingguanCollectorNominal - mingguanPenarikan;
+
+      const mingguanRows = [
+        { KETERANGAN: 'Total Setoran Tunai', NOMINAL: rekapMingguanData?.total_setoran || 0 },
+        { KETERANGAN: 'Total Penarikan Tunai (Sirela Penarikan)', NOMINAL: mingguanPenarikan },
+        { KETERANGAN: 'Total Transaksi Slip', JUMLAH: rekapMingguanData?.total_transaksi_count || 0 },
+        { KETERANGAN: 'Total Nominal Collector', NOMINAL: mingguanCollectorNominal },
+        { KETERANGAN: 'Total Transaksi Collector', JUMLAH: mingguanCollectorTx },
+        { KETERANGAN: 'Hasil Pengendapan (Collector - Sirela Penarikan)', NOMINAL: mingguanPengendapan },
+        { KETERANGAN: 'Jumlah Kunjungan (Total)', JUMLAH: rekapMingguanData?.total_kunjungan_count || 0 },
+        { KETERANGAN: 'Total Calon Prospek', JUMLAH: rekapMingguanData?.total_prospek_count || 0 },
+        { KETERANGAN: 'Total Target Canvasing', JUMLAH: rekapMingguanData?.total_survey_count || 0 }
+      ];
+      const wsMingguan = XLSX.utils.json_to_sheet(mingguanRows);
+      XLSX.utils.book_append_sheet(workbook, wsMingguan, 'Rekap Mingguan');
+
+      XLSX.writeFile(workbook, `Rekap_Mingguan_BMT_Hira_${tanggalDari}_sd_${tanggalSampai}.xlsx`);
     } else {
       const bulananCollectorNominal = Number(rekapBulananData?.collector_total_nominal || 0);
       const bulananCollectorTx = Number(rekapBulananData?.collector_total_transaksi || 0);
-      const bulananPengendapan = bulananCollectorNominal > 0 ? (bulananCollectorNominal - Number(rekapBulananData?.total_setoran || 0)) : 0;
+      const bulananPenarikan = Number(rekapBulananData?.total_penarikan || 0);
+      // Rumus Pengendapan: hasil collector - sirela penarikan
+      const bulananPengendapan = bulananCollectorNominal - bulananPenarikan;
 
       const bulananRows = [
         { KETERANGAN: 'Total Setoran Tunai', NOMINAL: rekapBulananData?.total_setoran || 0 },
-        { KETERANGAN: 'Total Penarikan Tunai', NOMINAL: rekapBulananData?.total_penarikan || 0 },
+        { KETERANGAN: 'Total Penarikan Tunai (Sirela Penarikan)', NOMINAL: bulananPenarikan },
         { KETERANGAN: 'Total Transaksi Slip', JUMLAH: rekapBulananData?.total_transaksi_count || 0 },
         { KETERANGAN: 'Total Nominal Collector', NOMINAL: bulananCollectorNominal },
         { KETERANGAN: 'Total Transaksi Collector', JUMLAH: bulananCollectorTx },
-        { KETERANGAN: 'Total Pengendapan (Selisih)', NOMINAL: bulananPengendapan },
+        { KETERANGAN: 'Hasil Pengendapan (Collector - Sirela Penarikan)', NOMINAL: bulananPengendapan },
         { KETERANGAN: 'Jumlah Kunjungan (Total)', JUMLAH: rekapBulananData?.total_kunjungan_count || 0 },
         { KETERANGAN: 'Total Calon Prospek', JUMLAH: rekapBulananData?.total_prospek_count || 0 },
-        { KETERANGAN: 'Total Survey & Penagihan', JUMLAH: rekapBulananData?.total_survey_count || 0 },
+        { KETERANGAN: 'Total Target Canvasing', JUMLAH: rekapBulananData?.total_survey_count || 0 },
         { KETERANGAN: 'Total Anggota Registered', JUMLAH: rekapBulananData?.total_anggota_count || 0 }
       ];
       const wsBulanan = XLSX.utils.json_to_sheet(bulananRows);
@@ -226,18 +283,26 @@ export const RekapLaporan = () => {
     <div className="space-y-6">
       {/* Top Filter & Actions (Hidden when printing) */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto">
           <button
             onClick={() => setActiveTab('harian')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+            className={`px-3 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
               activeTab === 'harian' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             REKAP HARIAN LENGKAP
           </button>
           <button
+            onClick={() => setActiveTab('mingguan')}
+            className={`px-3 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'mingguan' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            REKAP MINGGUAN
+          </button>
+          <button
             onClick={() => setActiveTab('bulanan')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+            className={`px-3 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
               activeTab === 'bulanan' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -270,6 +335,23 @@ export const RekapLaporan = () => {
               onChange={(e) => setTanggal(e.target.value)}
               className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none bg-slate-50 font-medium"
             />
+          ) : activeTab === 'mingguan' ? (
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2 py-1">
+              <span className="text-[11px] font-semibold text-slate-500">Dari:</span>
+              <input
+                type="date"
+                value={tanggalDari}
+                onChange={(e) => setTanggalDari(e.target.value)}
+                className="text-xs bg-transparent outline-none font-medium text-slate-700"
+              />
+              <span className="text-[11px] font-semibold text-slate-500">s/d</span>
+              <input
+                type="date"
+                value={tanggalSampai}
+                onChange={(e) => setTanggalSampai(e.target.value)}
+                className="text-xs bg-transparent outline-none font-medium text-slate-700"
+              />
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <select
@@ -329,13 +411,21 @@ export const RekapLaporan = () => {
           </div>
           <div className="text-left sm:text-right">
             <h2 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-slate-800">
-              {activeTab === 'harian' ? 'LAPORAN REKAPITULASI HARIAN' : 'LAPORAN REKAPITULASI BULANAN'}
+              {activeTab === 'harian'
+                ? 'LAPORAN REKAPITULASI HARIAN'
+                : activeTab === 'mingguan'
+                ? 'LAPORAN REKAPITULASI MINGGUAN'
+                : 'LAPORAN REKAPITULASI BULANAN'}
             </h2>
             <p className="text-xs font-semibold text-slate-700 mt-0.5">
               MARKETING: <span className="font-bold text-sky-800">{selectedUserObj ? selectedUserObj.nama : 'SEMUA MARKETING'}</span>
             </p>
             <p className="text-xs font-medium text-slate-600">
-              {activeTab === 'harian' ? `HARI / TGL : ${tanggal}` : `Periode: ${bulan} / ${tahun}`}
+              {activeTab === 'harian'
+                ? `HARI / TGL : ${tanggal}`
+                : activeTab === 'mingguan'
+                ? `PERIODE : ${formatDateDisplay(tanggalDari)} s/d ${formatDateDisplay(tanggalSampai)}`
+                : `Periode: ${bulan} / ${tahun}`}
             </p>
           </div>
         </div>
@@ -367,10 +457,13 @@ export const RekapLaporan = () => {
                     {formatRupiah(collectorNominal > 0 ? collectorNominal : totalTransaksiNominal)}
                   </span>
                 </div>
-                <div className="p-2">
-                  <span className="block text-[10px] font-bold text-slate-600 uppercase">PENGENDAPAN</span>
-                  <span className={`text-xs sm:text-sm font-black ${pengendapan !== 0 ? 'text-amber-700' : 'text-slate-700'}`}>
+                <div className="p-2 bg-sky-50/50">
+                  <span className="block text-[10px] font-bold text-sky-900 uppercase">HASIL PENGENDAPAN</span>
+                  <span className={`text-xs sm:text-sm font-black ${pengendapan !== 0 ? 'text-sky-800' : 'text-slate-700'}`}>
                     {formatRupiah(pengendapan)}
+                  </span>
+                  <span className="block text-[9px] text-slate-500 font-medium mt-0.5">
+                    Collector - Sirela Penarikan ({formatRupiah(sirelaPenarikanNominal)})
                   </span>
                 </div>
                 <div className="p-2 bg-amber-100/80">
@@ -507,10 +600,10 @@ export const RekapLaporan = () => {
               </div>
             </div>
 
-            {/* 3. SURVEY & PENAGIHAN PEMBIAYAAN */}
+            {/* 3. TARGET CANVASING (SEBELUMNYA SURVEY PEMBIAYAAN) */}
             <div>
               <h3 className="font-bold text-slate-800 uppercase tracking-wider mb-2 bg-slate-100 p-2 rounded border border-slate-200">
-                SURVEY & PENAGIHAN PEMBIAYAAN
+                TARGET CANVASING
               </h3>
               <div className="overflow-x-auto border border-slate-300 rounded">
                 <table className="w-full border-collapse text-left min-w-[500px]">
@@ -521,9 +614,9 @@ export const RekapLaporan = () => {
                       <th className="border-b border-r border-slate-300 p-2">ALAMAT</th>
                       <th className="border-b border-r border-slate-300 p-2">LOKASI GPS</th>
                       <th className="border-b border-r border-slate-300 p-2">NO. HP / WA</th>
-                      <th className="border-b border-r border-slate-300 p-2 text-center">OPSI / LAYANAN</th>
+                      <th className="border-b border-r border-slate-300 p-2 text-center">OPSI / LAYANAN CANVASING</th>
                       <th className="border-b border-r border-slate-300 p-2 text-right">PLAFOND (Rp)</th>
-                      <th className="border-b border-r border-slate-300 p-2">HASIL SURVEY / PENAGIHAN</th>
+                      <th className="border-b border-r border-slate-300 p-2">HASIL TARGET CANVASING</th>
                       <th className="border-b border-slate-300 p-2">KETERANGAN</th>
                     </tr>
                   </thead>
@@ -678,6 +771,67 @@ export const RekapLaporan = () => {
               </div>
             </div>
           </div>
+        ) : activeTab === 'mingguan' ? (
+          /* Rekap Mingguan */
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL SETORAN TUNAI</span>
+                <h3 className="text-base sm:text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapMingguanData?.total_setoran)}</h3>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL PENARIKAN TUNAI (SIRELA)</span>
+                <h3 className="text-base sm:text-lg font-bold text-rose-700 mt-1">{formatRupiah(rekapMingguanData?.total_penarikan)}</h3>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL TRANSAKSI SLIP</span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-1">{rekapMingguanData?.total_transaksi_count || 0} Slip</h3>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <span className="text-xs font-bold text-amber-800 uppercase">TOTAL NOMINAL COLLECTOR</span>
+                <h3 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{formatRupiah(rekapMingguanData?.collector_total_nominal)}</h3>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <span className="text-xs font-bold text-amber-800 uppercase">TOTAL TRANSAKSI COLLECTOR</span>
+                <h3 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{rekapMingguanData?.collector_total_transaksi || 0} Transaksi</h3>
+              </div>
+              <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
+                <span className="text-xs font-bold text-sky-800 uppercase">HASIL PENGENDAPAN</span>
+                <h3 className="text-base sm:text-lg font-bold text-sky-900 mt-1">
+                  {formatRupiah(
+                    Number(rekapMingguanData?.collector_total_nominal || 0) - Number(rekapMingguanData?.total_penarikan || 0)
+                  )}
+                </h3>
+                <span className="text-[10px] text-sky-700 block mt-0.5">Collector - Sirela Penarikan</span>
+              </div>
+              <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
+                <span className="text-xs font-bold text-sky-800 uppercase">TARGET CANVASING</span>
+                <h3 className="text-base sm:text-lg font-bold text-sky-700 mt-1">{rekapMingguanData?.total_survey_count || 0} Kali</h3>
+              </div>
+              <div className="bg-amber-100/70 p-4 rounded-xl border border-amber-300">
+                <span className="text-xs font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
+                <h3 className="text-lg sm:text-xl font-black text-amber-700 mt-1">{rekapMingguanData?.total_kunjungan_count || 0} Kunjungan</h3>
+              </div>
+            </div>
+
+            {/* Legal Tanda Tangan */}
+            <div className="pt-6 border-t border-slate-300 flex flex-col sm:flex-row justify-end items-center sm:items-end gap-6">
+              <div className="flex flex-wrap justify-center gap-8 sm:gap-12 text-center text-[11px] font-bold w-full sm:w-auto">
+                <div>
+                  <p className="mb-8 sm:mb-12">MARKETING / TELLER</p>
+                  <p className="underline uppercase">{selectedUserObj ? selectedUserObj.nama : 'Semua Marketing'}</p>
+                </div>
+                <div>
+                  <p className="mb-8 sm:mb-12">MENGETAHUI</p>
+                  <p className="underline uppercase">Koordinator Kolektor</p>
+                </div>
+                <div>
+                  <p className="mb-8 sm:mb-12">MANAGER CABANG</p>
+                  <p className="underline uppercase">Manager Cabang</p>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           /* Rekap Bulanan */
           <div className="space-y-6">
@@ -687,7 +841,7 @@ export const RekapLaporan = () => {
                 <h3 className="text-base sm:text-lg font-bold text-emerald-700 mt-1">{formatRupiah(rekapBulananData?.total_setoran)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL PENARIKAN TUNAI</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase">TOTAL PENARIKAN TUNAI (SIRELA)</span>
                 <h3 className="text-base sm:text-lg font-bold text-rose-700 mt-1">{formatRupiah(rekapBulananData?.total_penarikan)}</h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -703,22 +857,39 @@ export const RekapLaporan = () => {
                 <h3 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{rekapBulananData?.collector_total_transaksi || 0} Transaksi</h3>
               </div>
               <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
-                <span className="text-xs font-bold text-sky-800 uppercase">TOTAL PENGENDAPAN</span>
+                <span className="text-xs font-bold text-sky-800 uppercase">HASIL PENGENDAPAN</span>
                 <h3 className="text-base sm:text-lg font-bold text-sky-900 mt-1">
                   {formatRupiah(
-                    (Number(rekapBulananData?.collector_total_nominal || 0) > 0)
-                      ? (Number(rekapBulananData?.collector_total_nominal || 0) - Number(rekapBulananData?.total_setoran || 0))
-                      : 0
+                    Number(rekapBulananData?.collector_total_nominal || 0) - Number(rekapBulananData?.total_penarikan || 0)
                   )}
                 </h3>
+                <span className="text-[10px] text-sky-700 block mt-0.5">Collector - Sirela Penarikan</span>
               </div>
               <div className="bg-sky-50 p-4 rounded-xl border border-sky-200">
-                <span className="text-xs font-bold text-sky-800 uppercase">SURVEY PEMBIAYAAN</span>
+                <span className="text-xs font-bold text-sky-800 uppercase">TARGET CANVASING</span>
                 <h3 className="text-base sm:text-lg font-bold text-sky-700 mt-1">{rekapBulananData?.total_survey_count || 0} Kali</h3>
               </div>
               <div className="bg-amber-100/70 p-4 rounded-xl border border-amber-300">
                 <span className="text-xs font-black text-amber-900 uppercase">JUMLAH KUNJUNGAN</span>
                 <h3 className="text-lg sm:text-xl font-black text-amber-700 mt-1">{rekapBulananData?.total_kunjungan_count || 0} Kunjungan</h3>
+              </div>
+            </div>
+
+            {/* Legal Tanda Tangan */}
+            <div className="pt-6 border-t border-slate-300 flex flex-col sm:flex-row justify-end items-center sm:items-end gap-6">
+              <div className="flex flex-wrap justify-center gap-8 sm:gap-12 text-center text-[11px] font-bold w-full sm:w-auto">
+                <div>
+                  <p className="mb-8 sm:mb-12">MARKETING / TELLER</p>
+                  <p className="underline uppercase">{selectedUserObj ? selectedUserObj.nama : 'Semua Marketing'}</p>
+                </div>
+                <div>
+                  <p className="mb-8 sm:mb-12">MENGETAHUI</p>
+                  <p className="underline uppercase">Koordinator Kolektor</p>
+                </div>
+                <div>
+                  <p className="mb-8 sm:mb-12">MANAGER CABANG</p>
+                  <p className="underline uppercase">Manager Cabang</p>
+                </div>
               </div>
             </div>
           </div>

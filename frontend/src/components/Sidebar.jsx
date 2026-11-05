@@ -13,6 +13,7 @@ import {
   Coins,
   FileSpreadsheet,
   LogOut,
+  Target,
   X
 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
     { label: 'Daftar Prospek', path: '/prospek', icon: Users },
     { label: 'Anggota Tidak Transaksi', path: '/tidak-transaksi', icon: UserX },
     { label: 'Anggota Tidak Dikunjungi', path: '/tidak-dikunjungi', icon: UserMinus },
+    { label: 'Target Canvasing', path: '/target-canvasing', icon: Target },
     { label: 'Survey Pembiayaan', path: '/survey-pembiayaan', icon: ClipboardCheck },
     { label: 'Kas Disetor (Pecahan Tunai)', path: '/pecahan', icon: Coins },
     { label: 'Laporan Harian Kas', path: '/laporan-kas', icon: Wallet },

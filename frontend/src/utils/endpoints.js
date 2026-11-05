@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
     LIST: "/transaksi",
     CREATE: "/transaksi",
     DELETE: (id) => `/transaksi/${id}`,
+    SUMMARY_PENARIKAN: "/transaksi/summary-penarikan",
   },
   COLLECTOR: {
     LIST: "/collector",
@@ -51,6 +52,12 @@ export const API_ENDPOINTS = {
     UPDATE: (id) => `/survey-pembiayaan/${id}`,
     DELETE: (id) => `/survey-pembiayaan/${id}`,
   },
+  TARGET_CANVASING: {
+    LIST: "/target-canvasing",
+    CREATE: "/target-canvasing",
+    UPDATE: (id) => `/target-canvasing/${id}`,
+    DELETE: (id) => `/target-canvasing/${id}`,
+  },
   LAPORAN_KAS: {
     GET: "/laporan-kas",
     SAVE: "/laporan-kas",
@@ -61,6 +68,7 @@ export const API_ENDPOINTS = {
   },
   REKAP: {
     HARIAN: "/rekap/harian",
+    MINGGUAN: "/rekap/mingguan",
     BULANAN: "/rekap/bulanan",
   }
 };

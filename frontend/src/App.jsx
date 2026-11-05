@@ -11,6 +11,7 @@ import { TransaksiSlip } from './pages/TransaksiSlip';
 import { Collector } from './pages/Collector';
 import { DaftarProspek } from './pages/DaftarProspek';
 import { AnggotaKhusus } from './pages/AnggotaKhusus';
+import { TargetCanvasing } from './pages/TargetCanvasing';
 import { SurveyPembiayaan } from './pages/SurveyPembiayaan';
 import { LaporanKas } from './pages/LaporanKas';
 import { KasDisetorPecahan } from './pages/KasDisetorPecahan';
@@ -68,6 +69,7 @@ export default function App() {
               <Route path="/prospek" element={<DaftarProspek />} />
               <Route path="/tidak-transaksi" element={<AnggotaKhusus type="tidak-transaksi" />} />
               <Route path="/tidak-dikunjungi" element={<AnggotaKhusus type="tidak-dikunjungi" />} />
+              <Route path="/target-canvasing" element={<TargetCanvasing user={user} />} />
               <Route path="/survey-pembiayaan" element={<SurveyPembiayaan />} />
               <Route path="/laporan-kas" element={<LaporanKas />} />
               <Route path="/pecahan" element={<KasDisetorPecahan user={user} />} />
