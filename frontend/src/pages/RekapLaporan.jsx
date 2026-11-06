@@ -371,8 +371,9 @@ export const RekapLaporan = () => {
                 onChange={(e) => setTahun(Number(e.target.value))}
                 className="px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none bg-slate-50 font-medium"
               >
-                <option value={2026}>2026</option>
-                <option value={2025}>2025</option>
+                {[2030, 2029, 2028, 2027, 2026, 2025, 2024].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
               </select>
             </div>
           )}

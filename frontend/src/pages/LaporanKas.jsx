@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from '../utils/endpoints';
 import toast from 'react-hot-toast';
 import { Wallet, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getTodayString } from '../utils/date';
+import { MoneyInput } from '../components/MoneyInput';
 
 export const LaporanKas = () => {
   const [tanggal, setTanggal] = useState(getTodayString());
@@ -189,10 +190,9 @@ export const LaporanKas = () => {
               <div className="p-5 space-y-4 flex-1">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">1. KAS KANTOR (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.kas_kantor || ''}
-                    onChange={(e) => handleChange('kas_kantor', e.target.value)}
+                  <MoneyInput
+                    value={formData.kas_kantor}
+                    onChange={(val) => handleChange('kas_kantor', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
@@ -213,10 +213,9 @@ export const LaporanKas = () => {
                       <span>Auto-Fill Total Collector</span>
                     </button>
                   </div>
-                  <input
-                    type="number"
-                    value={formData.kolektor || ''}
-                    onChange={(e) => handleChange('kolektor', e.target.value)}
+                  <MoneyInput
+                    value={formData.kolektor}
+                    onChange={(val) => handleChange('kolektor', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                   />
@@ -235,10 +234,9 @@ export const LaporanKas = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">3. SIRELA / SETORAN (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.penerimaan_sibela || ''}
-                    onChange={(e) => handleChange('penerimaan_sibela', e.target.value)}
+                  <MoneyInput
+                    value={formData.penerimaan_sibela}
+                    onChange={(val) => handleChange('penerimaan_sibela', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
@@ -246,10 +244,9 @@ export const LaporanKas = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">4. LAIN-LAIN / LAINNYA (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.penerimaan_lain || ''}
-                    onChange={(e) => handleChange('penerimaan_lain', e.target.value)}
+                  <MoneyInput
+                    value={formData.penerimaan_lain}
+                    onChange={(val) => handleChange('penerimaan_lain', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
@@ -284,10 +281,9 @@ export const LaporanKas = () => {
                       <span>Auto-Fill Total Penarikan Sirela</span>
                     </button>
                   </div>
-                  <input
-                    type="number"
-                    value={formData.pengeluaran_sibela || ''}
-                    onChange={(e) => handleChange('pengeluaran_sibela', e.target.value)}
+                  <MoneyInput
+                    value={formData.pengeluaran_sibela}
+                    onChange={(val) => handleChange('pengeluaran_sibela', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none bg-white"
                   />
@@ -306,10 +302,9 @@ export const LaporanKas = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">2. REALISASI PINJAMAN (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.pengeluaran_pinjaman || ''}
-                    onChange={(e) => handleChange('pengeluaran_pinjaman', e.target.value)}
+                  <MoneyInput
+                    value={formData.pengeluaran_pinjaman}
+                    onChange={(val) => handleChange('pengeluaran_pinjaman', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none"
                   />
@@ -317,10 +312,9 @@ export const LaporanKas = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">3. BIAYA OPERASIONAL (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.pengeluaran_operasional || ''}
-                    onChange={(e) => handleChange('pengeluaran_operasional', e.target.value)}
+                  <MoneyInput
+                    value={formData.pengeluaran_operasional}
+                    onChange={(val) => handleChange('pengeluaran_operasional', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none"
                   />
@@ -328,10 +322,9 @@ export const LaporanKas = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">4. LAIN-LAIN (Rp)</label>
-                  <input
-                    type="number"
-                    value={formData.pengeluaran_lain || ''}
-                    onChange={(e) => handleChange('pengeluaran_lain', e.target.value)}
+                  <MoneyInput
+                    value={formData.pengeluaran_lain}
+                    onChange={(val) => handleChange('pengeluaran_lain', val)}
                     placeholder="0"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none"
                   />

@@ -133,6 +133,14 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// Admin only middleware (Manager & Pegawai cannot edit/create/delete users)
+const adminOnlyMiddleware = (req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Akses ditolak. Hanya administrator yang dapat mengelola data pegawai.' });
+  }
+  next();
+};
+
 // --- AUTH ENDPOINTS ---
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
@@ -216,7 +224,7 @@ app.get('/api/users', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/users', authMiddleware, async (req, res) => {
+app.post('/api/users', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   const { nama, username, password, role, jabatan, no_hp } = req.body;
   if (!nama || !username || !password) {
     return res.status(400).json({ success: false, message: 'Nama, username, dan password wajib diisi' });
@@ -237,7 +245,7 @@ app.post('/api/users', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/users/import-batch', authMiddleware, async (req, res) => {
+app.post('/api/users/import-batch', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   const items = Array.isArray(req.body) ? req.body : (req.body.usersList || req.body.data || []);
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Data pegawai untuk diimport tidak boleh kosong' });
@@ -307,7 +315,7 @@ app.post('/api/users/import-batch', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/users/:id', authMiddleware, async (req, res) => {
+app.put('/api/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   const { id } = req.params;
   const { nama, username, password, role, jabatan, no_hp, status } = req.body;
 
@@ -332,7 +340,7 @@ app.put('/api/users/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/users/:id', authMiddleware, async (req, res) => {
+app.delete('/api/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM users WHERE id = ?', [id]);

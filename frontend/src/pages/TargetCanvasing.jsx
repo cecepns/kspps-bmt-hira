@@ -3,6 +3,7 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
+import { MoneyInput } from '../components/MoneyInput';
 import toast from 'react-hot-toast';
 import {
   Target,
@@ -240,8 +241,9 @@ export const TargetCanvasing = ({ user }) => {
               onChange={(e) => setTahun(Number(e.target.value))}
               className="text-xs font-semibold text-slate-700 bg-transparent outline-none"
             >
-              <option value={2026}>2026</option>
-              <option value={2025}>2025</option>
+              {[2030, 2029, 2028, 2027, 2026, 2025, 2024].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
 
@@ -281,11 +283,11 @@ export const TargetCanvasing = ({ user }) => {
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">TARGET NASABAH</span>
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">TARGET ANGGOTA</span>
             <h3 className="text-base font-extrabold text-slate-800 mt-1">
               {totalRealisasiNasabah} / {totalTargetNasabah}
             </h3>
-            <span className="text-[10px] text-slate-400 font-medium">Realisasi vs Target Nasabah</span>
+            <span className="text-[10px] text-slate-400 font-medium">Realisasi vs Target Anggota</span>
           </div>
           <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
             <User className="w-5 h-5" />
@@ -348,9 +350,9 @@ export const TargetCanvasing = ({ user }) => {
                 <th className="p-3 w-12 text-center">NO</th>
                 <th className="p-3">MARKETING</th>
                 <th className="p-3">CABANG</th>
-                <th className="p-3 text-center">TARGET NASABAH</th>
+                <th className="p-3 text-center">TARGET ANGGOTA</th>
                 <th className="p-3 text-right">TARGET NOMINAL (Rp)</th>
-                <th className="p-3 text-center">REALISASI NASABAH</th>
+                <th className="p-3 text-center">REALISASI ANGGOTA</th>
                 <th className="p-3 text-right">REALISASI NOMINAL (Rp)</th>
                 <th className="p-3 text-center">% CAPAIAN</th>
                 <th className="p-3">KETERANGAN</th>
@@ -529,7 +531,7 @@ export const TargetCanvasing = ({ user }) => {
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Target Jumlah Nasabah</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Target Jumlah Anggota</label>
                 <input
                   type="number"
                   placeholder="Contoh: 20"
@@ -540,11 +542,10 @@ export const TargetCanvasing = ({ user }) => {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Target Nominal (Rp)</label>
-                <input
-                  type="number"
-                  placeholder="Contoh: 50000000"
+                <MoneyInput
+                  placeholder="Contoh: 50.000.000"
                   value={formData.target_nominal}
-                  onChange={(e) => setFormData({ ...formData, target_nominal: e.target.value })}
+                  onChange={(val) => setFormData({ ...formData, target_nominal: val })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-sky-500 outline-none bg-white"
                 />
               </div>
@@ -557,7 +558,7 @@ export const TargetCanvasing = ({ user }) => {
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Realisasi Nasabah</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Realisasi Anggota</label>
                 <input
                   type="number"
                   placeholder="0"
@@ -568,11 +569,10 @@ export const TargetCanvasing = ({ user }) => {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Realisasi Nominal (Rp)</label>
-                <input
-                  type="number"
+                <MoneyInput
                   placeholder="0"
                   value={formData.realisasi_nominal}
-                  onChange={(e) => setFormData({ ...formData, realisasi_nominal: e.target.value })}
+                  onChange={(val) => setFormData({ ...formData, realisasi_nominal: val })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                 />
               </div>

@@ -3,6 +3,7 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
+import { MoneyInput } from '../components/MoneyInput';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Edit2, Banknote, Calendar, User, TrendingUp, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -454,12 +455,10 @@ export const Collector = ({ user }) => {
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Jumlah Nominal (Rp)
             </label>
-            <input
-              type="number"
-              min="0"
-              placeholder="Contoh: 1500000"
+            <MoneyInput
+              placeholder="Contoh: 1.500.000"
               value={formData.jumlah_nominal}
-              onChange={(e) => setFormData({ ...formData, jumlah_nominal: e.target.value })}
+              onChange={(val) => setFormData({ ...formData, jumlah_nominal: val })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none font-bold text-slate-800"
               required
             />

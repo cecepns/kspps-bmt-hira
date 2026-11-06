@@ -41,7 +41,7 @@ export const Sidebar = ({ isOpen, onClose, user }) => {
     { label: 'Rekapan & Laporan', path: '/rekap', icon: FileSpreadsheet },
   ];
 
-  if (user?.role === 'admin' || user?.role === 'manager') {
+  if (user?.role === 'admin') {
     navItems.push({ label: 'Manajemen Pegawai', path: '/pegawai', icon: Users });
   }
 

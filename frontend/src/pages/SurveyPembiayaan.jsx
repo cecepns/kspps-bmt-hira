@@ -3,6 +3,7 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
+import { MoneyInput } from '../components/MoneyInput';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Edit, ClipboardCheck, Phone, Filter, DollarSign, MapPin, Navigation, ExternalLink, Loader2 } from 'lucide-react';
 import { getTodayString, formatDateDisplay } from '../utils/date';
@@ -494,14 +495,11 @@ export const SurveyPembiayaan = () => {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Jumlah Plafond (Rp)</label>
-              <input
-                type="number"
-                min="0"
-                step="10000"
+              <MoneyInput
                 value={formData.jumlah_plafond}
-                onChange={(e) => setFormData({ ...formData, jumlah_plafond: e.target.value })}
-                placeholder="Contoh: 15000000"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                onChange={(val) => setFormData({ ...formData, jumlah_plafond: val })}
+                placeholder="Contoh: 15.000.000"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-sky-500 font-mono font-bold text-slate-800"
               />
             </div>
           </div>

@@ -3,6 +3,7 @@ import { request } from '../utils/request';
 import { API_ENDPOINTS } from '../utils/endpoints';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
+import { MoneyInput } from '../components/MoneyInput';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Receipt, ArrowDownRight, ArrowUpRight, Banknote, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -329,11 +330,10 @@ export const TransaksiSlip = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Nominal (Rp)</label>
-            <input
-              type="number"
+            <MoneyInput
               value={formData.nominal}
-              onChange={(e) => setFormData({ ...formData, nominal: e.target.value })}
-              placeholder="Contoh: 100000"
+              onChange={(val) => setFormData({ ...formData, nominal: val })}
+              placeholder="Contoh: 100.000"
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none font-bold text-slate-800"
               required
             />
